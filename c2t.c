@@ -21,20 +21,16 @@ License:
 	*  Do what you like, remember to credit all sources when using.
 
 Description:
-	This small utility will read Apple I/II binary and
-	monitor text files and output Apple I or II AIFF and WAV
-	audio files for use with the Apple I and II cassette
-	interface.
+	This small utility will read Apple II binary
+	and output PCM samples 44100 / S16_LE
+	for use with the Apple II cassette interface.
 */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <unistd.h>
 
 #define VERSION "Version 1.0.1"
-
-FILE* fptr;
 
 void appendtone(int freq, int rate, double time, double cycles, int *offset)
 {
@@ -54,11 +50,11 @@ void appendtone(int freq, int rate, double time, double cycles, int *offset)
         int value = (2 * i * freq / rate + *offset ) % 2;
 		if (bits == 16) {
 			int v = value ? 0x6666 : -0x6666;
-			fputc((v & 0x00ff), fptr);
-			fputc((v & 0xff00) >> 8, fptr);
+			putchar((v & 0x00ff));
+			putchar((v & 0xff00) >> 8);
 		} else {
 			unsigned char v = (unsigned char)0xcc * value + 0x1a; // $80 +- $66 = 80% 7F
-			fputc(v, fptr);
+			putchar(v);
 		}
 	}
 
@@ -87,7 +83,6 @@ void usage()
 
 int main(int argc, char **argv)
 {
-	fptr = stdout;
 	FILE *ifp;
     int offset = 0;
 	int i, j;
