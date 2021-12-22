@@ -31,6 +31,7 @@ Description:
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <math.h>
 
 #define ABS(x) (((x) < 0) ? -(x) : (x))
 
@@ -38,6 +39,7 @@ Description:
 
 void appendtone(double **sound, long *length, int freq, int rate, double time, double cycles, int *offset)
 {
+    int square = 0;
 	long i, n=time*rate;
 	static long grow = 0;
 	double *tmp = NULL;
@@ -50,20 +52,31 @@ void appendtone(double **sound, long *length, int freq, int rate, double time, d
 
 	int j;
 
-	if(freq)
-		for (i = 0; i < n; i++) {
-			for(j = 0;j < rate / freq / 2;j++)
-				(*sound)[*length + i++] = 1;
-			for(j = 0;j < rate / freq / 2;j++)
-				(*sound)[*length + i++] = -1;
-			i--;
-		}
-	else
-		for (i = 0; i < n; i++)
-			(*sound)[*length + i] = 0;
+	if(square) {
+		int j;
 
-	if(cycles - (int)cycles == 0.5)
+		if(freq) {
+			for (i = 0; i < n; i++) {
+				for(j = 0;j < rate / freq / 2;j++)
+					(*sound)[*length + i++] = 1;
+				for(j = 0;j < rate / freq / 2;j++)
+					(*sound)[*length + i++] = -1;
+				i--;
+			}
+        } else {
+			for (i = 0; i < n; i++) {
+				(*sound)[*length + i] = 0;
+            }
+        }
+	} else {
+		for(i = 0; i < n; i++) {
+			(*sound)[*length+i] = sin(2 * M_PI * i * freq / rate + *offset * M_PI);
+        }
+    }
+
+	if(cycles - (int)cycles == 0.5) {
 		*offset = (*offset == 0);
+    }
 
 	*length += n;
 }
