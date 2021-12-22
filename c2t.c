@@ -45,7 +45,7 @@ void appendtone(int freq, int rate, double time, double cycles, int *offset)
 		n=cycles;
 
 	for (i = 0; i < n; i++) {
-        int value = (2 * i * freq / rate + *offset ) % 2;
+        int value = ((2 * i * freq) / rate + *offset ) % 2;
 		if (bits == 16) {
 			int v = value ? 0x6666 : -0x6666;
 			putchar((v & 0x00ff));
