@@ -37,11 +37,14 @@ Description:
 
 #define VERSION "Version 0.997a"
 
+FILE* fptr;
+
 void appendtone(double **sound, long *length, int freq, int rate, double time, double cycles, int *offset)
 {
     long n = time * rate;
 	long i;
 	int j;
+    int bits = 16;
 
 	if(freq && cycles)
 		n= cycles * rate / freq;
@@ -51,7 +54,15 @@ void appendtone(double **sound, long *length, int freq, int rate, double time, d
 
 	for (i = 0; i < n; i++) {
         int period = (rate / freq) / 2;
-        (*sound)[*length + i] = (2 * i * freq / rate + *offset ) % 2;
+        int value = (2 * i * freq / rate + *offset ) % 2;
+		if (bits == 16) {
+			int v = value ? 0x6666 : -0x6666;
+			fputc((v & 0x00ff), fptr);
+			fputc((v & 0xff00) >> 8, fptr);
+		} else {
+			unsigned char v = (unsigned char)0xcc * value + 0x1a; // $80 +- $66 = 80% 7F
+			fputc(v, fptr);
+		}
 	}
 
 	if(cycles - (int)cycles == 0.5) {
@@ -79,87 +90,9 @@ void usage()
 	fprintf(stderr, "-r: rate 44100/11025, -b: bits 8 or 16 -v: version");
 }
 
-void Write_WAVE(double *samples, long nsamples, int nfreq, int bits)
-{
-    FILE* fptr = stdout;
-    double amp = 0.90;
-	unsigned short v;
-	int i;
-	unsigned long totalsize, bytespersec;
-	double themin, themax, scale, themid;
-
-	// Write the form chunk
-//	fprintf(fptr, "RIFF");
-//	totalsize = (bits / 8) * nsamples + 36;
-//	fputc((totalsize & 0x000000ff), fptr);	// File size
-//	fputc((totalsize & 0x0000ff00) >> 8, fptr);
-//	fputc((totalsize & 0x00ff0000) >> 16, fptr);
-//	fputc((totalsize & 0xff000000) >> 24, fptr);
-//	fprintf(fptr, "WAVE");
-//	fprintf(fptr, "fmt ");		// fmt_ chunk
-//	fputc(16, fptr);			// Chunk size
-//	fputc(0, fptr);
-//	fputc(0, fptr);
-//	fputc(0, fptr);
-//	fputc(1, fptr);				// Format tag - uncompressed
-//	fputc(0, fptr);
-//	fputc(1, fptr);				// Channels
-//	fputc(0, fptr);
-//	fputc((nfreq & 0x000000ff), fptr);	// Sample frequency (Hz)
-//	fputc((nfreq & 0x0000ff00) >> 8, fptr);
-//	fputc((nfreq & 0x00ff0000) >> 16, fptr);
-//	fputc((nfreq & 0xff000000) >> 24, fptr);
-//	bytespersec = (bits / 8) * nfreq;
-//	fputc((bytespersec & 0x000000ff), fptr);	// Average bytes per second
-//	fputc((bytespersec & 0x0000ff00) >> 8, fptr);
-//	fputc((bytespersec & 0x00ff0000) >> 16, fptr);
-//	fputc((bytespersec & 0xff000000) >> 24, fptr);
-//	fputc((bits / 8), fptr);		// Block alignment
-//	fputc(0, fptr);
-//	fputc(bits, fptr);			// Bits per sample
-//	fputc(0, fptr);
-//	fprintf(fptr, "data");
-//	totalsize = (bits / 8) * nsamples;
-//	fputc((totalsize & 0x000000ff), fptr);	// Data size
-//	fputc((totalsize & 0x0000ff00) >> 8, fptr);
-//	fputc((totalsize & 0x00ff0000) >> 16, fptr);
-//	fputc((totalsize & 0xff000000) >> 24, fptr);
-
-	// Find the range
-	themin = samples[0];
-	themax = themin;
-	for (i = 1; i < nsamples; i++) {
-		if (samples[i] > themax)
-			themax = samples[i];
-		if (samples[i] < themin)
-			themin = samples[i];
-	}
-	if (themin >= themax) {
-		themin -= 1;
-		themax += 1;
-	}
-	themid = (themin + themax) / 2;
-	themin -= themid;
-	themax -= themid;
-	if (ABS(themin) > ABS(themax))
-		themax = ABS(themin);
-	scale = amp * ((bits == 16) ? 32760 : 124) / (themax);
-
-	// Write the data
-	for (i = 0; i < nsamples; i++) {
-		if (bits == 16) {
-			v = (unsigned short) (scale * (samples[i] - themid));
-			fputc((v & 0x00ff), fptr);
-			fputc((v & 0xff00) >> 8, fptr);
-		} else {
-			v = (unsigned char) (scale * (samples[i] - themid));
-			fputc(v + 0x80, fptr);
-		}
-	}
-}
-
 int main(int argc, char **argv)
 {
+	fptr = stdout;
 	FILE *ifp;
 	FILE *ofp;
 
@@ -212,8 +145,6 @@ int main(int argc, char **argv)
 	fprintf(stderr, "%d bytes read from %s\n", length, infilename);
 	fclose(ifp);
 
-	ofp=stdout;
-
 	appendtone(&output,&outputlength,770 ,rate,4.0,0  ,&offset);
 	appendtone(&output,&outputlength,2500,rate,0  ,0.5,&offset);
 	appendtone(&output,&outputlength,2000,rate,0  ,0.5,&offset);
@@ -224,5 +155,5 @@ int main(int argc, char **argv)
     }
     writebyte(checksum, &output, &outputlength, freq0, freq1, rate, &offset);
     appendtone(&output,&outputlength,1000,rate,0,1,&offset);
-    Write_WAVE(output,outputlength,rate,bits);
+//    Write_WAVE(output,outputlength,rate,bits);
 }
