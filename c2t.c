@@ -39,10 +39,9 @@ Description:
 
 void appendtone(double **sound, long *length, int freq, int rate, double time, double cycles, int *offset)
 {
-    int square = 0;
-	long i, n=time*rate;
-	static long grow = 0;
-	double *tmp = NULL;
+    int square = 1;
+    long n = time * rate;
+	long i;
 
 	if(freq && cycles)
 		n=cycles*rate/freq;
@@ -52,26 +51,8 @@ void appendtone(double **sound, long *length, int freq, int rate, double time, d
 
 	int j;
 
-	if(square) {
-		int j;
-
-		if(freq) {
-			for (i = 0; i < n; i++) {
-				for(j = 0;j < rate / freq / 2;j++)
-					(*sound)[*length + i++] = 1;
-				for(j = 0;j < rate / freq / 2;j++)
-					(*sound)[*length + i++] = -1;
-				i--;
-			}
-        } else {
-			for (i = 0; i < n; i++) {
-				(*sound)[*length + i] = 0;
-            }
-        }
-	} else {
-		for(i = 0; i < n; i++) {
-			(*sound)[*length+i] = sin(2 * M_PI * i * freq / rate + *offset * M_PI);
-        }
+    for(i = 0; i < n; i++) {
+	    (*sound)[*length+i] = sin(2 * M_PI * i * freq / rate + *offset * M_PI);
     }
 
 	if(cycles - (int)cycles == 0.5) {
@@ -234,7 +215,6 @@ int main(int argc, char **argv)
         writebyte(data[j], &output, &outputlength, freq0, freq1, rate, &offset);
         checksum ^= data[j];
     }
-
     writebyte(checksum, &output, &outputlength, freq0, freq1, rate, &offset);
     appendtone(&output,&outputlength,1000,rate,0,1,&offset);
     Write_WAVE(output,outputlength,rate,bits);
