@@ -37,22 +37,34 @@ Description:
 
 #define VERSION "Version 0.997a"
 
-void appendtone(double **sound, long *length, int freq, int rate, double time, double cycles, int *offset)
+void appendtone(double **sound, long *length, int freq, int rate, double time, double cycles, int *offset, int square)
 {
-    int square = 1;
     long n = time * rate;
 	long i;
+	int j;
 
 	if(freq && cycles)
-		n=cycles*rate/freq;
+		n= cycles * rate / freq;
 
 	if(n == 0)
 		n=cycles;
 
-	int j;
-
-    for(i = 0; i < n; i++) {
-	    (*sound)[*length+i] = sin(2 * M_PI * i * freq / rate + *offset * M_PI);
+	if(square) {
+		if(freq)
+			for (i = 0; i < n; i++) {
+				for(j = 0; j < rate / freq / 2; j++)
+					(*sound)[*length + i++] = 1;
+				for(j = 0; j < rate / freq / 2; j++)
+					(*sound)[*length + i++] = 0;
+				i--;
+			}
+		else
+			for (i = 0; i < n; i++)
+				(*sound)[*length + i] = 0;
+	} else {
+        for(i = 0; i < n; i++) {
+	        (*sound)[*length+i] = sin(2 * M_PI * i * freq / rate + *offset * M_PI);
+        }
     }
 
 	if(cycles - (int)cycles == 0.5) {
@@ -62,26 +74,28 @@ void appendtone(double **sound, long *length, int freq, int rate, double time, d
 	*length += n;
 }
 
-void writebyte(unsigned char x, double** poutput, long* poutputlength, int freq0, int freq1, int rate, int* poffset) {
+void writebyte(unsigned char x, double** poutput, long* poutputlength, int freq0, int freq1, int rate, int* poffset, int square) {
 	unsigned char j;
 	for(j = 0; j < 8; j++) {
 		if(x & 0x80)
-			appendtone(poutput,poutputlength,freq1,rate,0,1,poffset);
+			appendtone(poutput,poutputlength,freq1,rate,0,1,poffset,square);
 		else
-			appendtone(poutput,poutputlength,freq0,rate,0,1,poffset);
+			appendtone(poutput,poutputlength,freq0,rate,0,1,poffset,square);
 		x <<= 1;
 	}
 }
 
 void usage()
 {
-	fprintf(stderr,"c2t infile.bin\n");
+	fprintf(stderr,"c2t [-v] [-s] [-r rate] [-b bits] infile.bin\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "-s: square wave (default: sin), -r: rate 44100/11025, -b: bits 8 or 16 -v: version");
 }
 
 void Write_WAVE(double *samples, long nsamples, int nfreq, int bits)
 {
     FILE* fptr = stdout;
-    double amp = 0.75;
+    double amp = 0.90;
 	unsigned short v;
 	int i;
 	unsigned long totalsize, bytespersec;
@@ -165,22 +179,32 @@ int main(int argc, char **argv)
     double *output = (double*) malloc(10000000);
     long outputlength=0;
     int offset = 0;
-
-
 	int i, j;
 	int c;
     int length;
-    int rate=11025, bits=8, freq0=2000, freq1=1000;
+    int freq0=2000, freq1=1000;
+    int rate=44100;
+    int bits=16;
+    int square=0;
     char* data;
     char* infilename;
     unsigned char checksum = 0xff;
 	opterr = 1;
-	while((c = getopt(argc, argv, "v")) != -1) {
+	while((c = getopt(argc, argv, "sr:b:v")) != -1) {
 		switch(c) {
 			case 'v':		// version
 				fprintf(stderr,"\n%s\n\n",VERSION);
 				return 2;
 				break;
+            case 'r':
+                rate = atoi(optarg);
+                break;
+            case 'b':
+                bits = atoi(optarg);
+                break;
+            case 's':
+                square = 1;
+                break;
 		}
     }
 
@@ -207,15 +231,15 @@ int main(int argc, char **argv)
 
 	ofp=stdout;
 
-	appendtone(&output,&outputlength,770,rate,4.0,0,&offset);
-	appendtone(&output,&outputlength,2500,rate,0,0.5,&offset);
-	appendtone(&output,&outputlength,2000,rate,0,0.5,&offset);
+	appendtone(&output,&outputlength,770 ,rate,4.0,0  ,&offset,square);
+	appendtone(&output,&outputlength,2500,rate,0  ,0.5,&offset,square);
+	appendtone(&output,&outputlength,2000,rate,0  ,0.5,&offset,square);
 	checksum = 0xff;
     for(j=0; j<length; j++) {
-        writebyte(data[j], &output, &outputlength, freq0, freq1, rate, &offset);
+        writebyte(data[j], &output, &outputlength, freq0, freq1, rate, &offset, square);
         checksum ^= data[j];
     }
-    writebyte(checksum, &output, &outputlength, freq0, freq1, rate, &offset);
-    appendtone(&output,&outputlength,1000,rate,0,1,&offset);
+    writebyte(checksum, &output, &outputlength, freq0, freq1, rate, &offset, square);
+    appendtone(&output,&outputlength,1000,rate,0,1,&offset,square);
     Write_WAVE(output,outputlength,rate,bits);
 }
