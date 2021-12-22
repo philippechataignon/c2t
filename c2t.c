@@ -50,20 +50,13 @@ void appendtone(double **sound, long *length, int freq, int rate, double time, d
 		n=cycles;
 
 	if(square) {
-		if(freq)
-			for (i = 0; i < n; i++) {
-				for(j = 0; j < rate / freq / 2; j++)
-					(*sound)[*length + i++] = 1;
-				for(j = 0; j < rate / freq / 2; j++)
-					(*sound)[*length + i++] = 0;
-				i--;
-			}
-		else
-			for (i = 0; i < n; i++)
-				(*sound)[*length + i] = 0;
+		for (i = 0; i < n; i++) {
+            int period = rate / freq / 2;
+	        (*sound)[*length + i] = (2 * i * freq / rate + *offset ) % 2;
+		}
 	} else {
         for(i = 0; i < n; i++) {
-	        (*sound)[*length+i] = sin(2 * M_PI * i * freq / rate + *offset * M_PI);
+	        (*sound)[*length + i] = sin(2 * M_PI * i * freq / rate + *offset * M_PI);
         }
     }
 
