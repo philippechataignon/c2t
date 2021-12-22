@@ -236,5 +236,6 @@ int main(int argc, char **argv)
     }
 
     writebyte(checksum, &output, &outputlength, freq0, freq1, rate, &offset);
+    appendtone(&output,&outputlength,1000,rate,0,1,&offset);
     Write_WAVE(output,outputlength,rate,bits);
 }
