@@ -31,15 +31,12 @@ Description:
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <math.h>
 
-#define ABS(x) (((x) < 0) ? -(x) : (x))
-
-#define VERSION "Version 0.997a"
+#define VERSION "Version 1.0.1"
 
 FILE* fptr;
 
-void appendtone(double **sound, long *length, int freq, int rate, double time, double cycles, int *offset)
+void appendtone(int freq, int rate, double time, double cycles, int *offset)
 {
     long n = time * rate;
 	long i;
@@ -68,17 +65,15 @@ void appendtone(double **sound, long *length, int freq, int rate, double time, d
 	if(cycles - (int)cycles == 0.5) {
 		*offset = (*offset == 0);
     }
-
-	*length += n;
 }
 
-void writebyte(unsigned char x, double** poutput, long* poutputlength, int freq0, int freq1, int rate, int* poffset) {
+void writebyte(unsigned char x, int freq0, int freq1, int rate, int* poffset) {
 	unsigned char j;
 	for(j = 0; j < 8; j++) {
 		if(x & 0x80)
-			appendtone(poutput,poutputlength,freq1,rate,0,1,poffset);
+			appendtone(freq1,rate,0,1,poffset);
 		else
-			appendtone(poutput,poutputlength,freq0,rate,0,1,poffset);
+			appendtone(freq0,rate,0,1,poffset);
 		x <<= 1;
 	}
 }
@@ -94,10 +89,6 @@ int main(int argc, char **argv)
 {
 	fptr = stdout;
 	FILE *ifp;
-	FILE *ofp;
-
-    double *output = (double*) malloc(10000000);
-    long outputlength=0;
     int offset = 0;
 	int i, j;
 	int c;
@@ -145,15 +136,16 @@ int main(int argc, char **argv)
 	fprintf(stderr, "%d bytes read from %s\n", length, infilename);
 	fclose(ifp);
 
-	appendtone(&output,&outputlength,770 ,rate,4.0,0  ,&offset);
-	appendtone(&output,&outputlength,2500,rate,0  ,0.5,&offset);
-	appendtone(&output,&outputlength,2000,rate,0  ,0.5,&offset);
+	appendtone(770 ,rate,4.0,0  ,&offset);
+	appendtone(2500,rate,0  ,0.5,&offset);
+	appendtone(2000,rate,0  ,0.5,&offset);
 	checksum = 0xff;
     for(j=0; j<length; j++) {
-        writebyte(data[j], &output, &outputlength, freq0, freq1, rate, &offset);
+        writebyte(data[j], freq0, freq1, rate, &offset);
         checksum ^= data[j];
     }
-    writebyte(checksum, &output, &outputlength, freq0, freq1, rate, &offset);
-    appendtone(&output,&outputlength,1000,rate,0,1,&offset);
-//    Write_WAVE(output,outputlength,rate,bits);
+    writebyte(checksum, freq0, freq1, rate, &offset);
+    appendtone(1000,rate,0,1,&offset);
+    free(data);
+    return 0;
 }
