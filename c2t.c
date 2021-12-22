@@ -34,9 +34,8 @@ Description:
 
 void appendtone(int freq, int rate, double time, double cycles, int *offset)
 {
-    long n = time * rate;
-	long i;
-	int j;
+    unsigned long n = time * rate;
+	unsigned long i;
     int bits = 16;
 
 	if(freq && cycles)
@@ -46,7 +45,6 @@ void appendtone(int freq, int rate, double time, double cycles, int *offset)
 		n=cycles;
 
 	for (i = 0; i < n; i++) {
-        int period = (rate / freq) / 2;
         int value = (2 * i * freq / rate + *offset ) % 2;
 		if (bits == 16) {
 			int v = value ? 0x6666 : -0x6666;
@@ -92,10 +90,11 @@ int main(int argc, char **argv)
     int rate=44100;
     int bits=16;
     char* data;
+    int start;
     char* infilename;
     unsigned char checksum = 0xff;
 	opterr = 1;
-	while((c = getopt(argc, argv, "sr:b:v")) != -1) {
+	while((c = getopt(argc, argv, "s:r:b:v")) != -1) {
 		switch(c) {
 			case 'v':		// version
 				fprintf(stderr,"\n%s\n\n",VERSION);
@@ -106,6 +105,9 @@ int main(int argc, char **argv)
                 break;
             case 'b':
                 bits = atoi(optarg);
+                break;
+            case 's':
+                start = strtol(optarg, NULL, 16);
                 break;
 		}
     }
@@ -128,8 +130,11 @@ int main(int argc, char **argv)
 	}
 
     length = fread(data, 1, 65536, ifp);
-	fprintf(stderr, "%d bytes read from %s\n", length, infilename);
 	fclose(ifp);
+
+	fprintf(stderr, "%d bytes read from %s\n", length, infilename);
+	fprintf(stderr, "] CALL -151\n");
+	fprintf(stderr, "* %X.%XR\n", start, start + length - 1);
 
 	appendtone(770 ,rate,4.0,0  ,&offset);
 	appendtone(2500,rate,0  ,0.5,&offset);

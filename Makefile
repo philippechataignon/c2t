@@ -1,5 +1,5 @@
 CFLAGS=-O2
-LDLIBS=-lm
+LDLIBS=
 
 c2t:	c2t.o
 
