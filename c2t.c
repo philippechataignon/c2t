@@ -85,7 +85,7 @@ int main(int argc, char **argv)
     int bits=16;
     int applesoft=0;
     char* data;
-    int start;
+    int start = -1;
     char* infilename;
     unsigned char checksum = 0xff;
 	opterr = 1;
@@ -137,9 +137,11 @@ int main(int argc, char **argv)
     length = fread(data, 1, 65536, ifp);
 	fclose(ifp);
 
-	fprintf(stderr, "%d bytes read from %s\n", length, infilename);
-	fprintf(stderr, "] CALL -151\n");
-	fprintf(stderr, "* %X.%XR\n", start, start + length - 1);
+    if (start >= 0) {
+	    fprintf(stderr, "%d bytes read from %s\n", length, infilename);
+	    fprintf(stderr, "] CALL -151\n");
+	    fprintf(stderr, "* %X.%XR\n", start, start + length - 1);
+    }
 
     if (applesoft) {
 	    appendtone(770 ,rate,4,0, bits);
