@@ -32,19 +32,13 @@ Description:
 
 #define VERSION "Version 1.0.1"
 
-void appendtone(int freq, int rate, int time, int cycles)
+void appendtone(int freq, int rate, int time, int cycles, int bits)
 {
-	unsigned long i;
-    int bits = 16;
-    unsigned long n = time * rate;
     static int offset = 0;
 
-	if(freq > 0) {
-        n = time > 0 ? time * rate : (cycles * rate) / (2 * freq);
-    } else {
-		n = cycles;
-    }
+    unsigned long n = time > 0 ? time * rate : freq > 0 ? (cycles * rate) / (2 * freq) : cycles;
 
+	unsigned long i;
 	for (i = 0; i < n; i++) {
         int value = ((2 * i * freq) / rate + offset ) % 2;
 		if (bits == 16) {
@@ -62,13 +56,13 @@ void appendtone(int freq, int rate, int time, int cycles)
     }
 }
 
-void writebyte(unsigned char x, int freq0, int freq1, int rate) {
+void writebyte(unsigned char x, int freq0, int freq1, int rate, int bits) {
 	unsigned char j;
 	for(j = 0; j < 8; j++) {
 		if(x & 0x80)
-			appendtone(freq1, rate, 0, 2);
+			appendtone(freq1, rate, 0, 2, bits);
 		else
-			appendtone(freq0, rate, 0, 2);
+			appendtone(freq0, rate, 0, 2, bits);
 		x <<= 1;
 	}
 }
@@ -95,7 +89,7 @@ int main(int argc, char **argv)
     char* infilename;
     unsigned char checksum = 0xff;
 	opterr = 1;
-	while((c = getopt(argc, argv, "ads:r:b:v")) != -1) {
+	while((c = getopt(argc, argv, "ads:r:b:v8")) != -1) {
 		switch(c) {
 			case 'v':		// version
 				fprintf(stderr,"\n%s\n\n",VERSION);
@@ -116,6 +110,9 @@ int main(int argc, char **argv)
                 break;
             case 'a':
                 applesoft = 1;
+                break;
+            case '8':
+                bits = 8;
                 break;
 		}
     }
@@ -145,33 +142,33 @@ int main(int argc, char **argv)
 	fprintf(stderr, "* %X.%XR\n", start, start + length - 1);
 
     if (applesoft) {
-	    appendtone(770 ,rate,4,0);
-	    appendtone(2500,rate,0,1);
-	    appendtone(2000,rate,0,1);
+	    appendtone(770 ,rate,4,0, bits);
+	    appendtone(2500,rate,0,1, bits);
+	    appendtone(2000,rate,0,1, bits);
 	    checksum = 0xff;
         unsigned char tmp;
         tmp = (length - 1) & 0x000000ff;
         checksum ^= tmp;
-        writebyte(tmp, freq0, freq1, rate);
+        writebyte(tmp, freq0, freq1, rate, bits);
         tmp = ((length - 1) & 0x0000ff00) >> 8;
         checksum ^= tmp;
-        writebyte(tmp, freq0, freq1, rate);
+        writebyte(tmp, freq0, freq1, rate, bits);
         tmp = 0x55;
         checksum ^= tmp;
-        writebyte(tmp, freq0, freq1, rate);
-        writebyte(checksum, freq0, freq1, rate);
-        appendtone(1000,rate,0,2);
+        writebyte(tmp, freq0, freq1, rate, bits);
+        writebyte(checksum, freq0, freq1, rate, bits);
+        appendtone(1000,rate,0,2, bits);
     }
-	appendtone(770 ,rate,4,0);
-	appendtone(2500,rate,0,1);
-	appendtone(2000,rate,0,1);
+	appendtone(770 ,rate,4,0, bits);
+	appendtone(2500,rate,0,1, bits);
+	appendtone(2000,rate,0,1, bits);
 	checksum = 0xff;
     for(j=0; j<length; j++) {
-        writebyte(data[j], freq0, freq1, rate);
+        writebyte(data[j], freq0, freq1, rate, bits);
         checksum ^= data[j];
     }
-    writebyte(checksum, freq0, freq1, rate);
-    appendtone(1000,rate,0,2);
+    writebyte(checksum, freq0, freq1, rate, bits);
+    appendtone(1000,rate,0,2, bits);
     free(data);
     return 0;
 }
