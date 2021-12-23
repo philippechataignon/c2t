@@ -89,12 +89,13 @@ int main(int argc, char **argv)
     int freq0=2000, freq1=1000;
     int rate=44100;
     int bits=16;
+    int applesoft=0;
     char* data;
     int start;
     char* infilename;
     unsigned char checksum = 0xff;
 	opterr = 1;
-	while((c = getopt(argc, argv, "s:r:b:v")) != -1) {
+	while((c = getopt(argc, argv, "ads:r:b:v")) != -1) {
 		switch(c) {
 			case 'v':		// version
 				fprintf(stderr,"\n%s\n\n",VERSION);
@@ -108,6 +109,13 @@ int main(int argc, char **argv)
                 break;
             case 's':
                 start = strtol(optarg, NULL, 16);
+                break;
+            case 'd':
+                freq0 = 6000;
+                freq1 = 12000;
+                break;
+            case 'a':
+                applesoft = 1;
                 break;
 		}
     }
@@ -136,6 +144,24 @@ int main(int argc, char **argv)
 	fprintf(stderr, "] CALL -151\n");
 	fprintf(stderr, "* %X.%XR\n", start, start + length - 1);
 
+    if (applesoft) {
+	    appendtone(770 ,rate,4.0,0  ,&offset);
+	    appendtone(2500,rate,0  ,0.5,&offset);
+	    appendtone(2000,rate,0  ,0.5,&offset);
+	    checksum = 0xff;
+        unsigned char tmp;
+        tmp = (length - 1) & 0x000000ff;
+        checksum ^= tmp;
+        writebyte(tmp, freq0, freq1, rate, &offset);
+        tmp = ((length - 1) & 0x0000ff00) >> 8;
+        checksum ^= tmp;
+        writebyte(tmp, freq0, freq1, rate, &offset);
+        tmp = 0x55;
+        checksum ^= tmp;
+        writebyte(tmp, freq0, freq1, rate, &offset);
+        writebyte(checksum, freq0, freq1, rate, &offset);
+        appendtone(1000,rate,0,1,&offset);
+    }
 	appendtone(770 ,rate,4.0,0  ,&offset);
 	appendtone(2500,rate,0  ,0.5,&offset);
 	appendtone(2000,rate,0  ,0.5,&offset);
