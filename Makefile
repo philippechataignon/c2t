@@ -1,4 +1,4 @@
-CFLAGS=-O2
+CFLAGS=-O2 -Wall
 LDLIBS=
 
 c2t:	c2t.o

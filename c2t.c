@@ -77,7 +77,7 @@ void usage()
 int main(int argc, char **argv)
 {
 	FILE *ifp;
-	int i, j;
+	int j;
 	int c;
     int length;
     int freq0=2000, freq1=1000;
