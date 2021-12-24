@@ -129,7 +129,9 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
-	if ((ifp = fopen(infilename, "rb")) == NULL) {
+    if (infilename[0] == '-') {
+        ifp = stdin;
+    } else if ((ifp = fopen(infilename, "rb")) == NULL) {
 		fprintf(stderr,"Cannot read: %s\n\n",infilename);
 		return 4;
 	}
