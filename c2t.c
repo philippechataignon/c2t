@@ -30,7 +30,7 @@ Description:
 #include <stdlib.h>
 #include <unistd.h>
 
-#define VERSION "Version 1.0.1"
+#define VERSION "1.1.0"
 
 void appendtone(int freq, int rate, int time, int cycles, int bits)
 {
@@ -69,15 +69,25 @@ void writebyte(unsigned char byte, int freq0, int freq1, int rate, int bits) {
 
 void usage()
 {
-    fprintf(stderr,"c2t [-v] [-r rate] [-b bits] infile.bin\n");
+    fprintf(stderr,"\nVersion %s\n\n",VERSION);
+    fprintf(stderr,"c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.bin\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "-r: rate 44100/22050/11025/8000, -b: bits 8 or 16 -v: version");
+    fprintf(stderr, "-8: 8 bits, default 16 bits\n");
+    fprintf(stderr, "-a: applesoft binary\n");
+    fprintf(stderr, "-f: fast load (need load8000)\n");
+    fprintf(stderr, "-n: dry run\n");
+    fprintf(stderr, "-r: rate 44100/22050/11025/8000\n");
+    fprintf(stderr, "-s: start of program : gives monitor command\n");
 }
 
-void header(int rate, int bits) {
-    appendtone(770 ,rate,4,0, bits);
-    appendtone(2500,rate,0,1, bits);
-    appendtone(2000,rate,0,1, bits);
+void header(int rate, int bits, int fast) {
+    if (fast) {
+        appendtone(2000,rate,0,1000, bits);
+    } else {
+        appendtone(770 ,rate,4,0, bits);
+        appendtone(2500,rate,0,1, bits);
+        appendtone(2000,rate,0,1, bits);
+    }
 }
 
 int main(int argc, char **argv)
@@ -91,29 +101,28 @@ int main(int argc, char **argv)
     int bits=16;
     int applesoft=0;
     int fake=0;
+    int fast=0;
     char* data;
     int start = -1;
     char* infilename;
     unsigned char checksum = 0xff;
     opterr = 1;
-    while((c = getopt(argc, argv, "ads:r:b:v8n")) != -1) {
+    while((c = getopt(argc, argv, "afs:r:8nh")) != -1) {
         switch(c) {
-            case 'v':        // version
-                fprintf(stderr,"\n%s\n\n",VERSION);
-                return 2;
+            case 'h':        // version
+                usage();
+                return 0;
                 break;
             case 'r':
                 rate = atoi(optarg);
                 break;
-            case 'b':
-                bits = atoi(optarg);
-                break;
             case 's':
                 start = strtol(optarg, NULL, 16);
                 break;
-            case 'd':
-                freq0 = 6000;
-                freq1 = 12000;
+            case 'f':
+                freq0 = 12000;
+                freq1 = 6000;
+                fast = 1;
                 break;
             case 'a':
                 applesoft = 1;
@@ -161,7 +170,7 @@ int main(int argc, char **argv)
     }
 
     if (applesoft) {
-        header(rate, bits);
+        header(rate, bits, fast);
         checksum = 0xff;
         unsigned char tmp;
         tmp = (length - 1) & 0x000000ff;
@@ -176,14 +185,18 @@ int main(int argc, char **argv)
         writebyte(checksum, freq0, freq1, rate, bits);
         appendtone(1000,rate,0,2, bits);
     }
-    header(rate, bits);
+    header(rate, bits, fast);
     checksum = 0xff;
     for(j=0; j<length; j++) {
         writebyte(data[j], freq0, freq1, rate, bits);
         checksum ^= data[j];
     }
-    writebyte(checksum, freq0, freq1, rate, bits);
-    appendtone(1000,rate,0,2, bits);
     free(data);
+    writebyte(checksum, freq0, freq1, rate, bits);
+    if (fast) {
+        appendtone(770, rate, 0, 4, bits);
+    } else {
+        appendtone(1000, rate, 0, 2, bits);
+    }
     return 0;
 }
