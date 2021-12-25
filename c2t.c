@@ -22,7 +22,7 @@ License:
 
 Description:
     This small utility will read Apple II binary
-    and output PCM samples 44100 / S16_LE
+    and output PCM samples 48000 / S16_LE
     for use with the Apple II cassette interface.
 */
 
@@ -76,13 +76,13 @@ void usage()
     fprintf(stderr, "-a: applesoft binary\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
     fprintf(stderr, "-n: dry run\n");
-    fprintf(stderr, "-r: rate 44100/22050/11025/8000\n");
+    fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
     fprintf(stderr, "-s: start of program : gives monitor command\n");
 }
 
 void header(int rate, int bits, int fast) {
     if (fast) {
-        appendtone(2000,rate,0,1000, bits);
+        appendtone(2000,rate,0,500, bits);
     } else {
         appendtone(770 ,rate,4,0, bits);
         appendtone(2500,rate,0,1, bits);
@@ -97,17 +97,18 @@ int main(int argc, char **argv)
     int c;
     int length;
     int freq0=2000, freq1=1000;
-    int rate=44100;
+    int rate=48000;
     int bits=16;
     int applesoft=0;
     int fake=0;
     int fast=0;
     char* data;
     int start = -1;
+    int display_chksum = 0;
     char* infilename;
     unsigned char checksum = 0xff;
     opterr = 1;
-    while((c = getopt(argc, argv, "afs:r:8nh")) != -1) {
+    while((c = getopt(argc, argv, "acfhns:r:8")) != -1) {
         switch(c) {
             case 'h':        // version
                 usage();
@@ -132,6 +133,9 @@ int main(int argc, char **argv)
                 break;
             case 'n':
                 fake = 1;
+                break;
+            case 'c':
+                display_chksum = 1;
                 break;
         }
     }
@@ -192,9 +196,12 @@ int main(int argc, char **argv)
         checksum ^= data[j];
     }
     free(data);
+    if (display_chksum) {
+        fprintf(stderr, "Checksum: %X\n", checksum);
+    }
     writebyte(checksum, freq0, freq1, rate, bits);
     if (fast) {
-        appendtone(770, rate, 0, 4, bits);
+        appendtone(770, rate, 0, 16, bits);
     } else {
         appendtone(1000, rate, 0, 2, bits);
     }
