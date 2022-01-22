@@ -1,3 +1,6 @@
 [submodule "ihex"]
 	path = ihex
 	url = git@github.com:philippechataignon/ihex.git
+[submodule "bastoken"]
+	path = bastoken
+	url = git@github.com:philippechataignon/bastoken.git
