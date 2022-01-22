@@ -29,8 +29,18 @@ Description:
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
-#define VERSION "1.1.0"
+#include "ihex/kk_ihex_read.h"
+
+#define VERSION "1.2.0"
+#define AUTODETECT_ADDRESS (~0UL)
+
+static char* data;
+
+static unsigned long file_position = 0L;
+static unsigned long address_offset = 0UL;
+static unsigned int ptr = 0;
 
 void appendtone(int freq, int rate, int time, int cycles, int bits)
 {
@@ -70,7 +80,7 @@ void writebyte(unsigned char byte, int freq0, int freq1, int rate, int bits) {
 void usage()
 {
     fprintf(stderr,"\nVersion %s\n\n",VERSION);
-    fprintf(stderr,"c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.bin\n");
+    fprintf(stderr,"c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.hex\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "-8: 8 bits, default 16 bits\n");
     fprintf(stderr, "-a: applesoft binary\n");
@@ -90,6 +100,35 @@ void header(int rate, int bits, int fast) {
     }
 }
 
+ihex_bool_t
+ihex_data_read(struct ihex_state *ihex,
+               ihex_record_type_t type, ihex_bool_t error)
+{
+    error = error || (ihex->length < ihex->line_length);
+
+    if (type == IHEX_DATA_RECORD && !error) {
+        unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
+        if (address < address_offset) {
+            if (address_offset == AUTODETECT_ADDRESS) {
+                address_offset = address;
+            }
+        }
+        address -= address_offset;
+        if (address != file_position) {
+            if (file_position < address) {
+                do {
+                    data[ptr++] = '\0';
+                } while (++file_position < address);
+            }
+            file_position = address;
+        }
+        memcpy(data + ptr, ihex->data, ihex->length);
+        ptr += ihex->length;
+        file_position += ihex->length;
+    }
+    return !error;
+}
+
 int main(int argc, char **argv)
 {
     FILE *ifp;
@@ -102,17 +141,37 @@ int main(int argc, char **argv)
     int applesoft=0;
     int fake=0;
     int fast=0;
-    char* data;
+    int binary=0;
     int start = -1;
     int display_chksum = 0;
     char* infilename;
     unsigned char checksum = 0xff;
+    struct ihex_state ihex;
+    char buf[256];
+    address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while((c = getopt(argc, argv, "acfhns:r:8")) != -1) {
+    while((c = getopt(argc, argv, "abcfhnr:s:8")) != -1) {
         switch(c) {
+            case 'a':
+                applesoft = 1;
+                break;
+            case 'b':
+                binary = 1;
+                break;
+            case 'c':
+                display_chksum = 1;
+                break;
+            case 'f':
+                freq0 = 12000;
+                freq1 = 6000;
+                fast = 1;
+                break;
             case 'h':        // version
                 usage();
                 return 0;
+                break;
+            case 'n':
+                fake = 1;
                 break;
             case 'r':
                 rate = atoi(optarg);
@@ -120,22 +179,8 @@ int main(int argc, char **argv)
             case 's':
                 start = strtol(optarg, NULL, 16);
                 break;
-            case 'f':
-                freq0 = 12000;
-                freq1 = 6000;
-                fast = 1;
-                break;
-            case 'a':
-                applesoft = 1;
-                break;
             case '8':
                 bits = 8;
-                break;
-            case 'n':
-                fake = 1;
-                break;
-            case 'c':
-                display_chksum = 1;
                 break;
         }
     }
@@ -159,7 +204,17 @@ int main(int argc, char **argv)
         return 4;
     }
 
-    length = fread(data, 1, 65536, ifp);
+    if (binary) {
+        length = fread(data, 1, 65536, ifp);
+    } else {
+        ihex_read_at_address(&ihex, 0);
+        while (fgets(buf, sizeof(buf), ifp)) {
+            ihex_read_bytes(&ihex, buf, (ihex_count_t) strlen(buf));
+        }
+        ihex_end_read(&ihex);
+        start = address_offset;
+        length = ptr;
+    }
     fclose(ifp);
 
     if (start >= 0) {
