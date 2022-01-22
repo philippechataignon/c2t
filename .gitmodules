@@ -1,0 +1,3 @@
+[submodule "ihex"]
+	path = ihex
+	url = git@github.com:philippechataignon/ihex.git
