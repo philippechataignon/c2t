@@ -28,15 +28,22 @@ Description:
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <string.h>
 
 #include "ihex/kk_ihex_read.h"
 
 #define VERSION "1.2.0"
-#define AUTODETECT_ADDRESS (~0UL)
+#define AUTODETECT_ADDRESS UINT16_MAX
 
-unsigned char load8000[] = {
+static uint8_t data[65536];
+static uint32_t file_position = 0L;
+static uint16_t address_offset = 0UL;
+static uint16_t ptr = 0;
+
+uint16_t start_load8000 = 0x260;
+uint8_t load8000[] = {
     0xA5,0xFA,0x8D,0x8B,0x02,0xA5,0xFB,0x8D,0x8C,0x02,0xA2,0x00,0x2C,0x60,0xC0,0x10,
     0xFB,0xA9,0x01,0xA0,0x00,0x2C,0x60,0xC0,0x30,0xFB,0xC8,0x2C,0x60,0xC0,0x10,0xFA,
     0xC0,0x40,0xB0,0x17,0xC0,0x14,0xB0,0xEB,0xC0,0x07,0x3E,0x00,0x00,0xA0,0x00,0x0A,
@@ -49,14 +56,6 @@ unsigned char load8000[] = {
     0x20,0xED,0xFD,0x4C,0xE9,0x02,0x60,0x4F,0x4B,0x00,0x4B,0x4F,0x00
 };
 
-
-
-static unsigned char data[65536];
-static unsigned long file_position = 0L;
-static unsigned long address_offset = 0UL;
-static unsigned int ptr = 0;
-
-
 void usage()
 {
     fprintf(stderr,"\nVersion %s\n\n",VERSION);
@@ -66,27 +65,26 @@ void usage()
     fprintf(stderr, "-a: applesoft binary (implies -b)\n");
     fprintf(stderr, "-b: binary file (intel hex by default)\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
+    fprintf(stderr, "-g: get load8000\n");
     fprintf(stderr, "-l: locked basic program (implies -a -b)\n");
     fprintf(stderr, "-n: dry run\n");
     fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
     fprintf(stderr, "-s: start of program : gives monitor command\n");
 }
 
-void appendtone(int freq, int rate, int time, int cycles, int bits)
+void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles, uint8_t bits)
 {
-    static int offset = 0;
-
-    unsigned long n = time > 0 ? time * rate : freq > 0 ? (cycles * rate) / (2 * freq) : cycles;
-
-    unsigned long i;
+    uint32_t i;
+    static uint32_t offset = 0;
+    uint32_t n = time > 0 ? time * rate : freq > 0 ? (cycles * rate) / (2 * freq) : cycles;
     for (i = 0; i < n; i++) {
-        int value = ((2 * i * freq) / rate + offset ) % 2;
+        int16_t value = ((2 * i * freq) / rate + offset ) % 2;
         if (bits == 16) {
-            int v = value ? 0x6666 : -0x6666;
+            int16_t v = value ? 0x6666 : -0x6666;
             putchar(v & 0xff);
             putchar(v >> 8 & 0xff);
         } else {
-            unsigned char v = (unsigned char)0xcc * value + 0x1a; // $80 +- $66 = 80% 7F
+            uint8_t v = (int8_t)0xcc * value + 0x1a; // $80 +- $66 = 80% 7F
             putchar(v);
         }
     }
@@ -96,10 +94,10 @@ void appendtone(int freq, int rate, int time, int cycles, int bits)
     }
 }
 
-void writebyte(unsigned char byte, int rate, int bits, int fast) {
-    unsigned char j;
-    int freq0 = fast ? 12000 : 2000;
-    int freq1 = fast ? 6000 : 1000;
+void writebyte(uint8_t byte, uint16_t rate, uint8_t bits, uint8_t fast) {
+    uint8_t j;
+    uint32_t freq0 = fast ? 12000 : 2000;
+    uint32_t freq1 = fast ? 6000 : 1000;
     for(j = 0; j < 8; j++) {
         if(byte & 0x80)
             appendtone(freq1, rate, 0, 2, bits);
@@ -109,7 +107,7 @@ void writebyte(unsigned char byte, int rate, int bits, int fast) {
     }
 }
 
-void header(int rate, int bits, int fast) {
+void header(uint16_t rate, uint8_t bits, uint8_t fast) {
     if (fast) {
         appendtone(2000,rate,0,500, bits);
     } else {
@@ -119,11 +117,11 @@ void header(int rate, int bits, int fast) {
     }
 }
 
-void buff2wav(unsigned char* data, int length, int rate, int bits, int fast)
+void buff2wav(uint8_t* data, uint32_t length, uint16_t rate, uint8_t bits, uint8_t fast)
 {
     header(rate, bits, fast);
-    int j;
-    unsigned char checksum = 0xff;
+    uint32_t j;
+    uint8_t checksum = 0xff;
     for(j = 0; j < length; j++) {
         writebyte(data[j], rate, bits, fast);
         checksum ^= data[j];
@@ -143,7 +141,7 @@ ihex_data_read(struct ihex_state *ihex,
     error = error || (ihex->length < ihex->line_length);
 
     if (type == IHEX_DATA_RECORD && !error) {
-        unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
+        uint32_t address = (uint32_t)IHEX_LINEAR_ADDRESS(ihex);
         if (address < address_offset) {
             if (address_offset == AUTODETECT_ADDRESS) {
                 address_offset = address;
@@ -165,23 +163,23 @@ ihex_data_read(struct ihex_state *ihex,
     return !error;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char* argv[])
 {
     FILE *ifp;
-    int c;
-    int length;
-    int rate=48000;
-    int bits=16;
-    int applesoft=0;
-    int fake=0;
-    int fast=0;
-    int binary=0;
-    int lock=0;
-    int get_load=0;
-    int start = -1;
+    int16_t c;
+    uint32_t length;
+    uint16_t rate=48000;
+    uint8_t bits=16;
+    uint8_t applesoft=0;
+    uint8_t fake=0;
+    uint8_t fast=0;
+    uint8_t binary=0;
+    uint8_t lock=0;
+    uint8_t get_load=0;
+    int32_t start = -1;
     char* infilename;
-    struct ihex_state ihex;
     char buf[256];
+    struct ihex_state ihex;
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
     while((c = getopt(argc, argv, "abfghlnr:s:8")) != -1) {
@@ -251,13 +249,17 @@ int main(int argc, char **argv)
     fclose(ifp);
 
     if (start >= 0) {
-        int end = start + length - 1;
+        uint32_t end = start + length - 1;
         fprintf(stderr, "%d bytes read from %s\n", length, infilename);
         fprintf(stderr, "] CALL -151\n");
         if (fast) {
-            fprintf(stderr, "* FA:%X %X %X %X 260G (fast)\n", start & 0xff, start >> 8, end & 0xff, end >> 8);
+            if (get_load) {
+                fprintf(stderr, "* FA.FDR %X.%lXR %XG\n", start_load8000, start_load8000 + sizeof(load8000) - 1, start_load8000);
+            } else {
+                fprintf(stderr, "* FA.FDR %XG\n", start_load8000);
+            }
         } else {
-            fprintf(stderr, "* %X.%XR (normal)\n", start, end);
+            fprintf(stderr, "* %X.%XR\n", start, end);
         }
     }
 
@@ -266,17 +268,17 @@ int main(int argc, char **argv)
     }
 
     if (applesoft) {
-        unsigned char triplet[3] = {
+        uint8_t array[3] = {
             (length - 1) & 0xff,
             (length - 1) >> 8 & 0xff,
             lock ? 0xD5 : 0x55
         };
-        buff2wav(triplet, sizeof(triplet), rate, bits, fast);
+        buff2wav(array, sizeof(array), rate, bits, fast);
     }
 
     if (fast) {
-        int end = start + length - 1;
-        unsigned char array[4] = {
+        uint32_t end = start + length - 1;
+        uint8_t array[4] = {
             start & 0xff,
             start >> 8,
             end & 0xff,
