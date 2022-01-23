@@ -83,11 +83,11 @@ void usage()
     fprintf(stderr,"c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.hex\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "-8: 8 bits, default 16 bits\n");
-    fprintf(stderr, "-a: applesoft binary\n");
+    fprintf(stderr, "-a: applesoft binary (implies -b)\n");
     fprintf(stderr, "-b: binary file (intel hex by default)\n");
     fprintf(stderr, "-c: display checksum\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
-    fprintf(stderr, "-l: locked basic program (autostart)\n");
+    fprintf(stderr, "-l: locked basic program (implies -a -b)\n");
     fprintf(stderr, "-n: dry run\n");
     fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
     fprintf(stderr, "-s: start of program : gives monitor command\n");
@@ -158,6 +158,7 @@ int main(int argc, char **argv)
         switch(c) {
             case 'a':
                 applesoft = 1;
+                binary = 1;
                 break;
             case 'b':
                 binary = 1;
@@ -175,6 +176,8 @@ int main(int argc, char **argv)
                 return 0;
                 break;
             case 'l':
+                applesoft = 1;
+                binary = 1;
                 lock = 1;
                 break;
             case 'n':
