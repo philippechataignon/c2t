@@ -49,6 +49,9 @@ unsigned char load8000[] = {
     0x20,0xED,0xFD,0x4C,0xE9,0x02,0x60,0x4F,0x4B,0x00,0x4B,0x4F,0x00
 };
 
+
+
+static char data[65536];
 static unsigned long file_position = 0L;
 static unsigned long address_offset = 0UL;
 static unsigned int ptr = 0;
@@ -96,7 +99,6 @@ void usage()
     fprintf(stderr, "-8: 8 bits, default 16 bits\n");
     fprintf(stderr, "-a: applesoft binary (implies -b)\n");
     fprintf(stderr, "-b: binary file (intel hex by default)\n");
-    fprintf(stderr, "-c: display checksum\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
     fprintf(stderr, "-l: locked basic program (implies -a -b)\n");
     fprintf(stderr, "-n: dry run\n");
@@ -143,10 +145,26 @@ ihex_data_read(struct ihex_state *ihex,
     return !error;
 }
 
+void buff2wav(char* data, int length, int rate, int bits, int freq0, int freq1, int fast)
+{
+    header(rate, bits, fast);
+    int j;
+    unsigned char checksum = 0xff;
+    for(j = 0; j < length; j++) {
+        writebyte(data[j], freq0, freq1, rate, bits);
+        checksum ^= data[j];
+    }
+    writebyte(checksum, freq0, freq1, rate, bits);
+    if (fast) {
+        appendtone(770, rate, 0, 16, bits);
+    } else {
+        appendtone(1000, rate, 0, 2, bits);
+    }
+}
+
 int main(int argc, char **argv)
 {
     FILE *ifp;
-    int j;
     int c;
     int length;
     int freq0=2000, freq1=1000;
@@ -158,14 +176,13 @@ int main(int argc, char **argv)
     int binary=0;
     int lock=0;
     int start = -1;
-    int display_chksum = 0;
     char* infilename;
     unsigned char checksum = 0xff;
     struct ihex_state ihex;
     char buf[256];
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while((c = getopt(argc, argv, "abcfhlnr:s:8")) != -1) {
+    while((c = getopt(argc, argv, "abfhlnr:s:8")) != -1) {
         switch(c) {
             case 'a':
                 applesoft = 1;
@@ -173,9 +190,6 @@ int main(int argc, char **argv)
                 break;
             case 'b':
                 binary = 1;
-                break;
-            case 'c':
-                display_chksum = 1;
                 break;
             case 'f':
                 freq0 = 12000;
@@ -213,11 +227,6 @@ int main(int argc, char **argv)
 
     infilename = argv[optind];
 
-    if((data = malloc(64*1024 + 1)) == NULL) {
-        fprintf(stderr,"could not allocate 64KiB data\n");
-        return 3;
-    }
-
     if (infilename[0] == '-') {
         ifp = stdin;
     } else if ((ifp = fopen(infilename, "rb")) == NULL) {
@@ -241,11 +250,11 @@ int main(int argc, char **argv)
     if (start >= 0) {
         fprintf(stderr, "%d bytes read from %s\n", length, infilename);
         fprintf(stderr, "] CALL -151\n");
-        fprintf(stderr, "* %X.%XR\n", start, start + length - 1);
+        fprintf(stderr, "* %X.%XR (normal)\n", start, start + length - 1);
+        fprintf(stderr, "* FA:%X %X %X %X 260G (fast)\n", start & 0xff, start >> 8, (start + length - 1) & 0xff, (start + length - 1) >> 8);
     }
 
     if (fake) {
-        free(data);
         return 0;
     }
 
@@ -268,21 +277,7 @@ int main(int argc, char **argv)
         writebyte(checksum, freq0, freq1, rate, bits);
         appendtone(1000,rate,0,2, bits);
     }
-    header(rate, bits, fast);
-    checksum = 0xff;
-    for(j=0; j<length; j++) {
-        writebyte(data[j], freq0, freq1, rate, bits);
-        checksum ^= data[j];
-    }
-    free(data);
-    if (display_chksum) {
-        fprintf(stderr, "Checksum: %X\n", checksum);
-    }
-    writebyte(checksum, freq0, freq1, rate, bits);
-    if (fast) {
-        appendtone(770, rate, 0, 16, bits);
-    } else {
-        appendtone(1000, rate, 0, 2, bits);
-    }
+
+    buff2wav(data, length, rate, bits, freq0, freq1, fast);
     return 0;
 }
