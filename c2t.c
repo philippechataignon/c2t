@@ -51,7 +51,7 @@ unsigned char load8000[] = {
 
 
 
-static char data[65536];
+static unsigned char data[65536];
 static unsigned long file_position = 0L;
 static unsigned long address_offset = 0UL;
 static unsigned int ptr = 0;
@@ -145,7 +145,7 @@ ihex_data_read(struct ihex_state *ihex,
     return !error;
 }
 
-void buff2wav(char* data, int length, int rate, int bits, int freq0, int freq1, int fast)
+void buff2wav(unsigned char* data, int length, int rate, int bits, int freq0, int freq1, int fast)
 {
     header(rate, bits, fast);
     int j;
@@ -278,6 +278,7 @@ int main(int argc, char **argv)
         appendtone(1000,rate,0,2, bits);
     }
 
+    // buff2wav(load8000, sizeof(load8000), rate, bits, freq0, freq1, fast);
     buff2wav(data, length, rate, bits, freq0, freq1, fast);
     return 0;
 }
