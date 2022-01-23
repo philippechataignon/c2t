@@ -274,7 +274,7 @@ int main(int argc, char **argv)
         buff2wav(triplet, sizeof(triplet), rate, bits, fast);
     }
 
-    if (fast && get_load) {
+    if (fast) {
         int end = start + length - 1;
         unsigned char array[4] = {
             start & 0xff,
@@ -283,7 +283,9 @@ int main(int argc, char **argv)
             end >> 8
         };
         buff2wav(array, sizeof(array), rate, bits, 0);
-        buff2wav(load8000, sizeof(load8000), rate, bits, 0);
+        if (get_load) {
+            buff2wav(load8000, sizeof(load8000), rate, bits, 0);
+        }
     }
     buff2wav(data, length, rate, bits, fast);
     return 0;
