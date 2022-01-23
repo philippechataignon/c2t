@@ -56,6 +56,22 @@ static unsigned long file_position = 0L;
 static unsigned long address_offset = 0UL;
 static unsigned int ptr = 0;
 
+
+void usage()
+{
+    fprintf(stderr,"\nVersion %s\n\n",VERSION);
+    fprintf(stderr,"c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.hex\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "-8: 8 bits, default 16 bits\n");
+    fprintf(stderr, "-a: applesoft binary (implies -b)\n");
+    fprintf(stderr, "-b: binary file (intel hex by default)\n");
+    fprintf(stderr, "-f: fast load (need load8000)\n");
+    fprintf(stderr, "-l: locked basic program (implies -a -b)\n");
+    fprintf(stderr, "-n: dry run\n");
+    fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
+    fprintf(stderr, "-s: start of program : gives monitor command\n");
+}
+
 void appendtone(int freq, int rate, int time, int cycles, int bits)
 {
     static int offset = 0;
@@ -80,8 +96,10 @@ void appendtone(int freq, int rate, int time, int cycles, int bits)
     }
 }
 
-void writebyte(unsigned char byte, int freq0, int freq1, int rate, int bits) {
+void writebyte(unsigned char byte, int rate, int bits, int fast) {
     unsigned char j;
+    int freq0 = fast ? 12000 : 2000;
+    int freq1 = fast ? 6000 : 1000;
     for(j = 0; j < 8; j++) {
         if(byte & 0x80)
             appendtone(freq1, rate, 0, 2, bits);
@@ -91,21 +109,6 @@ void writebyte(unsigned char byte, int freq0, int freq1, int rate, int bits) {
     }
 }
 
-void usage()
-{
-    fprintf(stderr,"\nVersion %s\n\n",VERSION);
-    fprintf(stderr,"c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.hex\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "-8: 8 bits, default 16 bits\n");
-    fprintf(stderr, "-a: applesoft binary (implies -b)\n");
-    fprintf(stderr, "-b: binary file (intel hex by default)\n");
-    fprintf(stderr, "-f: fast load (need load8000)\n");
-    fprintf(stderr, "-l: locked basic program (implies -a -b)\n");
-    fprintf(stderr, "-n: dry run\n");
-    fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
-    fprintf(stderr, "-s: start of program : gives monitor command\n");
-}
-
 void header(int rate, int bits, int fast) {
     if (fast) {
         appendtone(2000,rate,0,500, bits);
@@ -113,6 +116,23 @@ void header(int rate, int bits, int fast) {
         appendtone(770 ,rate,4,0, bits);
         appendtone(2500,rate,0,1, bits);
         appendtone(2000,rate,0,1, bits);
+    }
+}
+
+void buff2wav(unsigned char* data, int length, int rate, int bits, int fast)
+{
+    header(rate, bits, fast);
+    int j;
+    unsigned char checksum = 0xff;
+    for(j = 0; j < length; j++) {
+        writebyte(data[j], rate, bits, fast);
+        checksum ^= data[j];
+    }
+    writebyte(checksum, rate, bits, fast);
+    if (fast) {
+        appendtone(770, rate, 0, 16, bits);
+    } else {
+        appendtone(1000, rate, 0, 2, bits);
     }
 }
 
@@ -145,29 +165,11 @@ ihex_data_read(struct ihex_state *ihex,
     return !error;
 }
 
-void buff2wav(unsigned char* data, int length, int rate, int bits, int freq0, int freq1, int fast)
-{
-    header(rate, bits, fast);
-    int j;
-    unsigned char checksum = 0xff;
-    for(j = 0; j < length; j++) {
-        writebyte(data[j], freq0, freq1, rate, bits);
-        checksum ^= data[j];
-    }
-    writebyte(checksum, freq0, freq1, rate, bits);
-    if (fast) {
-        appendtone(770, rate, 0, 16, bits);
-    } else {
-        appendtone(1000, rate, 0, 2, bits);
-    }
-}
-
 int main(int argc, char **argv)
 {
     FILE *ifp;
     int c;
     int length;
-    int freq0=2000, freq1=1000;
     int rate=48000;
     int bits=16;
     int applesoft=0;
@@ -175,13 +177,14 @@ int main(int argc, char **argv)
     int fast=0;
     int binary=0;
     int lock=0;
+    int get_load=0;
     int start = -1;
     char* infilename;
     struct ihex_state ihex;
     char buf[256];
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while((c = getopt(argc, argv, "abfhlnr:s:8")) != -1) {
+    while((c = getopt(argc, argv, "abfghlnr:s:8")) != -1) {
         switch(c) {
             case 'a':
                 applesoft = 1;
@@ -191,9 +194,10 @@ int main(int argc, char **argv)
                 binary = 1;
                 break;
             case 'f':
-                freq0 = 12000;
-                freq1 = 6000;
                 fast = 1;
+                break;
+            case 'g':
+                get_load = 1;
                 break;
             case 'h':        // version
                 usage();
@@ -247,10 +251,14 @@ int main(int argc, char **argv)
     fclose(ifp);
 
     if (start >= 0) {
+        int end = start + length - 1;
         fprintf(stderr, "%d bytes read from %s\n", length, infilename);
         fprintf(stderr, "] CALL -151\n");
-        fprintf(stderr, "* %X.%XR (normal)\n", start, start + length - 1);
-        fprintf(stderr, "* FA:%X %X %X %X 260G (fast)\n", start & 0xff, start >> 8, (start + length - 1) & 0xff, (start + length - 1) >> 8);
+        if (fast) {
+            fprintf(stderr, "* FA:%X %X %X %X 260G (fast)\n", start & 0xff, start >> 8, end & 0xff, end >> 8);
+        } else {
+            fprintf(stderr, "* %X.%XR (normal)\n", start, end);
+        }
     }
 
     if (fake) {
@@ -263,11 +271,20 @@ int main(int argc, char **argv)
             (length - 1) >> 8 & 0xff,
             lock ? 0xD5 : 0x55
         };
-        buff2wav(triplet, sizeof(triplet), rate, bits, freq0, freq1, fast);
+        buff2wav(triplet, sizeof(triplet), rate, bits, fast);
     }
 
-    // buff2wav(load8000, sizeof(load8000), rate, bits, freq0, freq1, fast);
-    load8000[0x32] = 0;
-    buff2wav(data, length, rate, bits, freq0, freq1, fast);
+    if (fast && get_load) {
+        int end = start + length - 1;
+        unsigned char array[4] = {
+            start & 0xff,
+            start >> 8,
+            end & 0xff,
+            end >> 8
+        };
+        buff2wav(array, sizeof(array), rate, bits, 0);
+        buff2wav(load8000, sizeof(load8000), rate, bits, 0);
+    }
+    buff2wav(data, length, rate, bits, fast);
     return 0;
 }

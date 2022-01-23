@@ -23,3 +23,4 @@ def hex2c(infile, line=16):
 if __name__ == '__main__':
     import sys
     hex2mon(sys.argv[1])
+    hex2c(sys.argv[1])
