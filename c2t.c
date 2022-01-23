@@ -276,6 +276,8 @@ int main(int argc, char *argv[])
             } else {
                 fprintf(stderr, "* FA.FDR %XG\n", start_load8000);
             }
+            fprintf(stderr, "* %X.%X\n", start, end);
+            fprintf(stderr, "* %XG\n", start);
         } else {
             fprintf(stderr, "* %X.%XR\n", start, end);
         }
