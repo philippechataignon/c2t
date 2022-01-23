@@ -44,22 +44,33 @@ static uint16_t ptr = 0;
 
 uint16_t start_load8000 = 0x260;
 uint8_t load8000[] = {
-    0xA5,0xFA,0x8D,0x8B,0x02,0xA5,0xFB,0x8D,0x8C,0x02,0xA2,0x00,0x2C,0x60,0xC0,0x10,
-    0xFB,0xA9,0x01,0xA0,0x00,0x2C,0x60,0xC0,0x30,0xFB,0xC8,0x2C,0x60,0xC0,0x10,0xFA,
-    0xC0,0x40,0xB0,0x17,0xC0,0x14,0xB0,0xEB,0xC0,0x07,0x3E,0x00,0x00,0xA0,0x00,0x0A,
-    0xD0,0xE1,0xE8,0xD0,0xDC,0xEE,0x8C,0x02,0x4C,0x71,0x02,0x8A,0x18,0x6D,0x8B,0x02,
-    0x8D,0x8B,0x02,0x90,0x03,0xEE,0x8C,0x02,0xA9,0x00,0x85,0xEB,0xA5,0xFB,0x85,0xEC,
-    0xA9,0xFF,0xA4,0xFA,0x51,0xEB,0xA6,0xEC,0xE4,0xFD,0xB0,0x08,0xC8,0xD0,0xF5,0xE6,
-    0xEC,0x4C,0xB4,0x02,0xC8,0xF0,0x06,0xC4,0xFC,0x90,0xE9,0xF0,0xE7,0x85,0xFE,0xA0,
-    0x01,0x51,0xFC,0xD0,0x03,0x4C,0xDF,0x02,0xA9,0xFA,0xA0,0x02,0x4C,0xE3,0x02,0xA9,
-    0xF7,0xA0,0x02,0x85,0xEB,0x84,0xEC,0xA0,0xFF,0xC8,0xB1,0xEB,0xF0,0x08,0x09,0x80,
-    0x20,0xED,0xFD,0x4C,0xE9,0x02,0x60,0x4F,0x4B,0x00,0x4B,0x4F,0x00
+    0xA5, 0xFA, 0x8D, 0x8B, 0x02, 0xA5, 0xFB, 0x8D,
+    0x8C, 0x02, 0xA2, 0x00, 0x2C, 0x60, 0xC0, 0x10,
+    0xFB, 0xA9, 0x01, 0xA0, 0x00, 0x2C, 0x60, 0xC0,
+    0x30, 0xFB, 0xC8, 0x2C, 0x60, 0xC0, 0x10, 0xFA,
+    0xC0, 0x40, 0xB0, 0x17, 0xC0, 0x14, 0xB0, 0xEB,
+    0xC0, 0x07, 0x3E, 0x00, 0x00, 0xA0, 0x00, 0x0A,
+    0xD0, 0xE1, 0xE8, 0xD0, 0xDC, 0xEE, 0x8C, 0x02,
+    0x4C, 0x71, 0x02, 0x8A, 0x18, 0x6D, 0x8B, 0x02,
+    0x8D, 0x8B, 0x02, 0x90, 0x03, 0xEE, 0x8C, 0x02,
+    0xA9, 0x00, 0x85, 0xEB, 0xA5, 0xFB, 0x85, 0xEC,
+    0xA9, 0xFF, 0xA4, 0xFA, 0x51, 0xEB, 0xA6, 0xEC,
+    0xE4, 0xFD, 0xB0, 0x08, 0xC8, 0xD0, 0xF5, 0xE6,
+    0xEC, 0x4C, 0xB4, 0x02, 0xC8, 0xF0, 0x06, 0xC4,
+    0xFC, 0x90, 0xE9, 0xF0, 0xE7, 0x85, 0xFE, 0xA0,
+    0x01, 0x51, 0xFC, 0xD0, 0x03, 0x4C, 0xDF, 0x02,
+    0xA9, 0xFA, 0xA0, 0x02, 0x4C, 0xE3, 0x02, 0xA9,
+    0xF7, 0xA0, 0x02, 0x85, 0xEB, 0x84, 0xEC, 0xA0,
+    0xFF, 0xC8, 0xB1, 0xEB, 0xF0, 0x08, 0x09, 0x80,
+    0x20, 0xED, 0xFD, 0x4C, 0xE9, 0x02, 0x60, 0x4F,
+    0x4B, 0x00, 0x4B, 0x4F, 0x00
 };
 
 void usage()
 {
-    fprintf(stderr,"\nVersion %s\n\n",VERSION);
-    fprintf(stderr,"c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.hex\n");
+    fprintf(stderr, "\nVersion %s\n\n", VERSION);
+    fprintf(stderr,
+            "c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.hex\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "-8: 8 bits, default 16 bits\n");
     fprintf(stderr, "-a: applesoft binary (implies -b)\n");
@@ -72,19 +83,22 @@ void usage()
     fprintf(stderr, "-s: start of program : gives monitor command\n");
 }
 
-void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles, uint8_t bits)
+void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles,
+                uint8_t bits)
 {
     uint32_t i;
     static uint32_t offset = 0;
-    uint32_t n = time > 0 ? time * rate : freq > 0 ? (cycles * rate) / (2 * freq) : cycles;
+    uint32_t n =
+        time > 0 ? time * rate : freq >
+        0 ? (cycles * rate) / (2 * freq) : cycles;
     for (i = 0; i < n; i++) {
-        int16_t value = ((2 * i * freq) / rate + offset ) % 2;
+        int16_t value = ((2 * i * freq) / rate + offset) % 2;
         if (bits == 16) {
             int16_t v = value ? 0x6666 : -0x6666;
             putchar(v & 0xff);
             putchar(v >> 8 & 0xff);
         } else {
-            uint8_t v = (int8_t)0xcc * value + 0x1a; // $80 +- $66 = 80% 7F
+            uint8_t v = (int8_t) 0xcc * value + 0x1a;   // $80 +- $66 = 80% 7F
             putchar(v);
         }
     }
@@ -94,12 +108,13 @@ void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles, ui
     }
 }
 
-void writebyte(uint8_t byte, uint16_t rate, uint8_t bits, uint8_t fast) {
+void writebyte(uint8_t byte, uint16_t rate, uint8_t bits, uint8_t fast)
+{
     uint8_t j;
     uint32_t freq0 = fast ? 12000 : 2000;
     uint32_t freq1 = fast ? 6000 : 1000;
-    for(j = 0; j < 8; j++) {
-        if(byte & 0x80)
+    for (j = 0; j < 8; j++) {
+        if (byte & 0x80)
             appendtone(freq1, rate, 0, 2, bits);
         else
             appendtone(freq0, rate, 0, 2, bits);
@@ -107,22 +122,24 @@ void writebyte(uint8_t byte, uint16_t rate, uint8_t bits, uint8_t fast) {
     }
 }
 
-void header(uint16_t rate, uint8_t bits, uint8_t fast) {
+void header(uint16_t rate, uint8_t bits, uint8_t fast)
+{
     if (fast) {
-        appendtone(2000,rate,0,500, bits);
+        appendtone(2000, rate, 0, 500, bits);
     } else {
-        appendtone(770 ,rate,4,0, bits);
-        appendtone(2500,rate,0,1, bits);
-        appendtone(2000,rate,0,1, bits);
+        appendtone(770, rate, 4, 0, bits);
+        appendtone(2500, rate, 0, 1, bits);
+        appendtone(2000, rate, 0, 1, bits);
     }
 }
 
-void buff2wav(uint8_t* data, uint32_t length, uint16_t rate, uint8_t bits, uint8_t fast)
+void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t bits,
+              uint8_t fast)
 {
     header(rate, bits, fast);
     uint32_t j;
     uint8_t checksum = 0xff;
-    for(j = 0; j < length; j++) {
+    for (j = 0; j < length; j++) {
         writebyte(data[j], rate, bits, fast);
         checksum ^= data[j];
     }
@@ -141,7 +158,7 @@ ihex_data_read(struct ihex_state *ihex,
     error = error || (ihex->length < ihex->line_length);
 
     if (type == IHEX_DATA_RECORD && !error) {
-        uint32_t address = (uint32_t)IHEX_LINEAR_ADDRESS(ihex);
+        uint32_t address = (uint32_t) IHEX_LINEAR_ADDRESS(ihex);
         if (address < address_offset) {
             if (address_offset == AUTODETECT_ADDRESS) {
                 address_offset = address;
@@ -163,61 +180,60 @@ ihex_data_read(struct ihex_state *ihex,
     return !error;
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     FILE *ifp;
     int16_t c;
     uint32_t length;
-    uint16_t rate=48000;
-    uint8_t bits=16;
-    uint8_t applesoft=0;
-    uint8_t fake=0;
-    uint8_t fast=0;
-    uint8_t binary=0;
-    uint8_t lock=0;
-    uint8_t get_load=0;
+    uint16_t rate = 48000;
+    uint8_t bits = 16;
+    uint8_t applesoft = 0;
+    uint8_t fake = 0;
+    uint8_t fast = 0;
+    uint8_t binary = 0;
+    uint8_t lock = 0;
+    uint8_t get_load = 0;
     int32_t start = -1;
-    char* infilename;
+    char *infilename;
     char buf[256];
-    struct ihex_state ihex;
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while((c = getopt(argc, argv, "abfghlnr:s:8")) != -1) {
-        switch(c) {
-            case 'a':
-                applesoft = 1;
-                binary = 1;
-                break;
-            case 'b':
-                binary = 1;
-                break;
-            case 'f':
-                fast = 1;
-                break;
-            case 'g':
-                get_load = 1;
-                break;
-            case 'h':        // version
-                usage();
-                return 0;
-                break;
-            case 'l':
-                applesoft = 1;
-                binary = 1;
-                lock = 1;
-                break;
-            case 'n':
-                fake = 1;
-                break;
-            case 'r':
-                rate = atoi(optarg);
-                break;
-            case 's':
-                start = strtol(optarg, NULL, 16);
-                break;
-            case '8':
-                bits = 8;
-                break;
+    while ((c = getopt(argc, argv, "abfghlnr:s:8")) != -1) {
+        switch (c) {
+        case 'a':
+            applesoft = 1;
+            binary = 1;
+            break;
+        case 'b':
+            binary = 1;
+            break;
+        case 'f':
+            fast = 1;
+            break;
+        case 'g':
+            get_load = 1;
+            break;
+        case 'h':              // version
+            usage();
+            return 0;
+            break;
+        case 'l':
+            applesoft = 1;
+            binary = 1;
+            lock = 1;
+            break;
+        case 'n':
+            fake = 1;
+            break;
+        case 'r':
+            rate = atoi(optarg);
+            break;
+        case 's':
+            start = strtol(optarg, NULL, 16);
+            break;
+        case '8':
+            bits = 8;
+            break;
         }
     }
 
@@ -231,13 +247,14 @@ int main(int argc, char* argv[])
     if (infilename[0] == '-') {
         ifp = stdin;
     } else if ((ifp = fopen(infilename, "rb")) == NULL) {
-        fprintf(stderr,"Cannot read: %s\n\n",infilename);
+        fprintf(stderr, "Cannot read: %s\n\n", infilename);
         return 4;
     }
 
     if (binary) {
         length = fread(data, 1, 65536, ifp);
     } else {
+        struct ihex_state ihex;
         ihex_read_at_address(&ihex, 0);
         while (fgets(buf, sizeof(buf), ifp)) {
             ihex_read_bytes(&ihex, buf, (ihex_count_t) strlen(buf));
@@ -254,7 +271,8 @@ int main(int argc, char* argv[])
         fprintf(stderr, "] CALL -151\n");
         if (fast) {
             if (get_load) {
-                fprintf(stderr, "* FA.FDR %X.%lXR %XG\n", start_load8000, start_load8000 + sizeof(load8000) - 1, start_load8000);
+                fprintf(stderr, "* FA.FDR %X.%lXR %XG\n", start_load8000,
+                        start_load8000 + sizeof(load8000) - 1, start_load8000);
             } else {
                 fprintf(stderr, "* FA.FDR %XG\n", start_load8000);
             }

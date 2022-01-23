@@ -12,7 +12,7 @@ def hex2mon(infile, line=16):
                 print(fmt(ih[sr]), end=" ")
             print()
 
-def hex2c(infile, line=16):
+def hex2c(infile, line=8):
     ih = IntelHex(infile)
     for s in ih.segments():
         for a in range(s[0], s[1], line):
