@@ -177,7 +177,6 @@ int main(int argc, char **argv)
     int lock=0;
     int start = -1;
     char* infilename;
-    unsigned char checksum = 0xff;
     struct ihex_state ihex;
     char buf[256];
     address_offset = AUTODETECT_ADDRESS;
@@ -259,26 +258,16 @@ int main(int argc, char **argv)
     }
 
     if (applesoft) {
-        header(rate, bits, fast);
-        checksum = 0xff;
-        unsigned char tmp;
-        tmp = (length - 1) & 0x000000ff;
-        checksum ^= tmp;
-        writebyte(tmp, freq0, freq1, rate, bits);
-        tmp = ((length - 1) & 0x0000ff00) >> 8;
-        checksum ^= tmp;
-        writebyte(tmp, freq0, freq1, rate, bits);
-        tmp = 0x55;
-        if (lock) {
-            tmp |= 0x80;
-        }
-        checksum ^= tmp;
-        writebyte(tmp, freq0, freq1, rate, bits);
-        writebyte(checksum, freq0, freq1, rate, bits);
-        appendtone(1000,rate,0,2, bits);
+        unsigned char triplet[3] = {
+            (length - 1) & 0xff,
+            (length - 1) >> 8 & 0xff,
+            lock ? 0xD5 : 0x55
+        };
+        buff2wav(triplet, sizeof(triplet), rate, bits, freq0, freq1, fast);
     }
 
     // buff2wav(load8000, sizeof(load8000), rate, bits, freq0, freq1, fast);
+    load8000[0x32] = 0;
     buff2wav(data, length, rate, bits, freq0, freq1, fast);
     return 0;
 }
