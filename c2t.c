@@ -84,7 +84,10 @@ void usage()
     fprintf(stderr, "\n");
     fprintf(stderr, "-8: 8 bits, default 16 bits\n");
     fprintf(stderr, "-a: applesoft binary\n");
+    fprintf(stderr, "-b: binary file (intel hex by default)\n");
+    fprintf(stderr, "-c: display checksum\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
+    fprintf(stderr, "-l: locked basic program (autostart)\n");
     fprintf(stderr, "-n: dry run\n");
     fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
     fprintf(stderr, "-s: start of program : gives monitor command\n");
@@ -142,6 +145,7 @@ int main(int argc, char **argv)
     int fake=0;
     int fast=0;
     int binary=0;
+    int lock=0;
     int start = -1;
     int display_chksum = 0;
     char* infilename;
@@ -150,7 +154,7 @@ int main(int argc, char **argv)
     char buf[256];
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while((c = getopt(argc, argv, "abcfhnr:s:8")) != -1) {
+    while((c = getopt(argc, argv, "abcfhlnr:s:8")) != -1) {
         switch(c) {
             case 'a':
                 applesoft = 1;
@@ -169,6 +173,9 @@ int main(int argc, char **argv)
             case 'h':        // version
                 usage();
                 return 0;
+                break;
+            case 'l':
+                lock = 1;
                 break;
             case 'n':
                 fake = 1;
@@ -239,6 +246,9 @@ int main(int argc, char **argv)
         checksum ^= tmp;
         writebyte(tmp, freq0, freq1, rate, bits);
         tmp = 0x55;
+        if (lock) {
+            tmp |= 0x80;
+        }
         checksum ^= tmp;
         writebyte(tmp, freq0, freq1, rate, bits);
         writebyte(checksum, freq0, freq1, rate, bits);
