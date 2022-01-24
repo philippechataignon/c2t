@@ -1,5 +1,5 @@
 /*
-c2t, Code to Tape|Text, Version 0.997, Wed Sep 27 15:27:56 GMT 2017
+c2t, Code to Tape
 
 Parts copyright (c) 2011-2017 All Rights Reserved, Egan Ford (egan@sense.net)
 
@@ -21,7 +21,7 @@ License:
     *  Do what you like, remember to credit all sources when using.
 
 Description:
-    This small utility will read Apple II binary
+    This small utility will read Apple II binary or intel hex files
     and output PCM samples 48000 / S16_LE
     for use with the Apple II cassette interface.
 */
@@ -34,7 +34,7 @@ Description:
 
 #include "ihex/kk_ihex_read.h"
 
-#define VERSION "1.2.0"
+#define VERSION "1.2.1"
 #define AUTODETECT_ADDRESS UINT16_MAX
 
 static uint8_t data[65536];
@@ -87,7 +87,7 @@ void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles,
                 uint8_t bits)
 {
     uint32_t i;
-    static uint32_t offset = 0;
+    static uint8_t offset = 0;
     uint32_t n =
         time > 0 ? time * rate : freq >
         0 ? (cycles * rate) / (2 * freq) : cycles;
@@ -122,8 +122,11 @@ void writebyte(uint8_t byte, uint16_t rate, uint8_t bits, uint8_t fast)
     }
 }
 
-void header(uint16_t rate, uint8_t bits, uint8_t fast)
+void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t bits,
+              uint8_t fast)
 {
+    uint32_t i;
+    // header
     if (fast) {
         appendtone(2000, rate, 0, 500, bits);
     } else {
@@ -131,19 +134,15 @@ void header(uint16_t rate, uint8_t bits, uint8_t fast)
         appendtone(2500, rate, 0, 1, bits);
         appendtone(2000, rate, 0, 1, bits);
     }
-}
-
-void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t bits,
-              uint8_t fast)
-{
-    header(rate, bits, fast);
-    uint32_t j;
+    // data
     uint8_t checksum = 0xff;
-    for (j = 0; j < length; j++) {
-        writebyte(data[j], rate, bits, fast);
-        checksum ^= data[j];
+    for (i = 0; i < length; i++) {
+        writebyte(data[i], rate, bits, fast);
+        checksum ^= data[i];
     }
+    // checksum
     writebyte(checksum, rate, bits, fast);
+    // ending
     if (fast) {
         appendtone(770, rate, 0, 16, bits);
     } else {
@@ -213,7 +212,7 @@ int main(int argc, char *argv[])
         case 'g':
             get_load = 1;
             break;
-        case 'h':              // version
+        case 'h':
             usage();
             return 0;
             break;
@@ -304,6 +303,7 @@ int main(int argc, char *argv[])
             end & 0xff,
             end >> 8
         };
+        // array and load8000 are send at normal speed
         buff2wav(array, sizeof(array), rate, bits, 0);
         if (get_load) {
             buff2wav(load8000, sizeof(load8000), rate, bits, 0);
