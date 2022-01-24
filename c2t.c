@@ -42,24 +42,25 @@ static uint32_t file_position = 0L;
 static uint16_t address_offset = 0UL;
 static uint16_t ptr = 0;
 
+uint16_t entry_load8000 = 0x2A0;
 uint16_t start_load8000 = 0x280;
 uint8_t load8000[] = {
+    0xA5, 0xFA, 0x8D, 0xC1, 0x02, 0x8D, 0xD4, 0x02,
+    0xA5, 0xFB, 0x8D, 0xC2, 0x02, 0x8D, 0xD5, 0x02,
+    0xA5, 0xFC, 0x8D, 0xFB, 0x02, 0xA5, 0xFD, 0x8D,
+    0xFC, 0x02, 0x4C, 0xA0, 0x02, 0x00, 0x00, 0x00,
     0xA2, 0x00, 0x2C, 0x60, 0xC0, 0x10, 0xFB, 0xA9,
     0x01, 0xA0, 0x00, 0x2C, 0x60, 0xC0, 0x30, 0xFB,
     0xC8, 0x2C, 0x60, 0xC0, 0x10, 0xFA, 0xC0, 0x40,
     0xB0, 0x17, 0xC0, 0x14, 0xB0, 0xEB, 0xC0, 0x07,
     0x3E, 0x00, 0x00, 0xA0, 0x00, 0x0A, 0xD0, 0xE1,
-    0xE8, 0xD0, 0xDC, 0xEE, 0xA2, 0x02, 0x4C, 0x87,
+    0xE8, 0xD0, 0xDC, 0xEE, 0xC2, 0x02, 0x4C, 0xA7,
     0x02, 0xA9, 0xFF, 0x4D, 0x00, 0x00, 0xAA, 0xEE,
-    0xB4, 0x02, 0xD0, 0x03, 0xEE, 0xB5, 0x02, 0xAD,
-    0xB4, 0x02, 0xCD, 0xF5, 0x02, 0xAD, 0xB5, 0x02,
-    0xED, 0xF6, 0x02, 0x8A, 0x90, 0xE5, 0xF0, 0x07,
-    0xA9, 0xF2, 0xA0, 0x02, 0x4C, 0xDB, 0x02, 0xA9,
-    0xEF, 0xA0, 0x02, 0x85, 0xEB, 0x84, 0xEC, 0xA0,
-    0xFF, 0xC8, 0xB1, 0xEB, 0xF0, 0x08, 0x09, 0x80,
-    0x20, 0xED, 0xFD, 0x4C, 0xE1, 0x02, 0x60, 0x4F,
-    0x4B, 0x00, 0x4B, 0x4F, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    0xD4, 0x02, 0xD0, 0x03, 0xEE, 0xD5, 0x02, 0xAD,
+    0xFB, 0x02, 0xCD, 0xD4, 0x02, 0xAD, 0xFC, 0x02,
+    0xED, 0xD5, 0x02, 0x8A, 0xB0, 0xE5, 0xF0, 0x0A,
+    0xA9, 0xCB, 0x20, 0xED, 0xFD, 0xA9, 0xCF, 0x20,
+    0xED, 0xFD, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
 void usage()
@@ -73,6 +74,7 @@ void usage()
     fprintf(stderr, "-b: binary file (intel hex by default)\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
     fprintf(stderr, "-l: locked basic program (implies -a -b)\n");
+    fprintf(stderr, "-m: fast load monitor mode, doesn't send load8000\n");
     fprintf(stderr, "-n: dry run\n");
     fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
     fprintf(stderr, "-s: start of program : gives monitor command\n");
@@ -178,7 +180,7 @@ int main(int argc, char *argv[])
 {
     FILE *ifp;
     int16_t c;
-    uint32_t length;
+    uint16_t length;
     uint16_t rate = 48000;
     uint8_t bits = 16;
     uint8_t applesoft = 0;
@@ -186,12 +188,13 @@ int main(int argc, char *argv[])
     uint8_t fast = 0;
     uint8_t binary = 0;
     uint8_t lock = 0;
+    uint8_t monitor = 0;
     int32_t start = -1;
     char *infilename;
     char buf[256];
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while ((c = getopt(argc, argv, "abfhlnr:s:8")) != -1) {
+    while ((c = getopt(argc, argv, "abfhlmnr:s:8")) != -1) {
         switch (c) {
         case 'a':
             applesoft = 1;
@@ -211,6 +214,9 @@ int main(int argc, char *argv[])
             applesoft = 1;
             binary = 1;
             lock = 1;
+            break;
+        case 'm':
+            monitor = 1;
             break;
         case 'n':
             fake = 1;
@@ -256,14 +262,20 @@ int main(int argc, char *argv[])
     fclose(ifp);
 
     if (start >= 0) {
-        uint32_t end = start + length - 1;
+        int32_t end = start + length - 1;
+        fprintf(stderr, "Memory range: %X.%X\n", start, end);
         fprintf(stderr, "] CALL -151\n");
         if (fast) {
-            fprintf(stderr, "* %X.%lXR %XG\n",
-                    start_load8000,
-                    start_load8000 + sizeof(load8000) - 1, start_load8000);
-            fprintf(stderr, "* %X.%X\n", start, end);
-            fprintf(stderr, "* %XG\n", start);
+            if (monitor) {
+                end++;
+                fprintf(stderr, "* FA:%X %X %X %X N %XG\n",
+                        start & 0xff, start >> 8, end & 0xff, end >> 8,
+                        start_load8000);
+            } else {
+                fprintf(stderr, "* %X.%XR %XG\n", start_load8000,
+                        start_load8000 + (uint16_t) sizeof(load8000) - 1,
+                        entry_load8000);
+            }
         } else {
             fprintf(stderr, "* %X.%XR\n", start, end);
         }
@@ -282,14 +294,14 @@ int main(int argc, char *argv[])
         buff2wav(array, sizeof(array), rate, bits, fast);
     }
 
-    if (fast) {
-        uint32_t end = start + length + 1;
-        load8000[0x21] = start & 0xff;
-        load8000[0x22] = start >> 8;
-        load8000[0x34] = start & 0xff;
-        load8000[0x35] = start >> 8;
-        load8000[0x75] = end & 0xff;
-        load8000[0x76] = end >> 8;
+    if (fast & !monitor) {
+        uint32_t end = start + length;
+        load8000[0x41] = start & 0xff;
+        load8000[0x42] = start >> 8;
+        load8000[0x54] = start & 0xff;
+        load8000[0x55] = start >> 8;
+        load8000[0x7B] = end & 0xff;
+        load8000[0x7C] = end >> 8;
         // load8000 is send at normal speed
         buff2wav(load8000, sizeof(load8000), rate, bits, 0);
     }
