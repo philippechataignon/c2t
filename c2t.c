@@ -266,7 +266,6 @@ int main(int argc, char *argv[])
 
     if (start >= 0) {
         uint32_t end = start + length - 1;
-        fprintf(stderr, "%d bytes read from %s\n", length, infilename);
         fprintf(stderr, "] CALL -151\n");
         if (fast) {
             if (get_load) {
