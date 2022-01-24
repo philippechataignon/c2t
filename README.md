@@ -43,7 +43,7 @@ PC output
 * 280.2FCR
 ```
 ------------------------------------------------------------------------------
-File in intel hex format
+File in intel hex format, normal speed
 
 ```
 PC command:
@@ -53,6 +53,24 @@ Apple command:
 ] CALL -151
 * 280.2FCR
 ```
+------------------------------------------------------------------------------
+File in intel hex format, fast speed
+
+```
+PC command:
+% ./c2t ../asm6502/intbasic.hex -f | ap
+
+Apple command:
+] CALL -151
+* 280.2FFR 280G
+
+PC output memory range and entry point to go:
+* A000.B424
+* A000G
+```
+With fast speed (-f), Apple ][ commands are always the same: `280.2FFR 280G`.
+Because dynamic load and self.midification, program at $280 can't be reuse.
+
 ------------------------------------------------------------------------------
 Tokenized Appelsoft source created with `bastoken.py`
 
@@ -86,52 +104,3 @@ Apple command:
 ] LOAD
 ```
 ------------------------------------------------------------------------------
-Fast load with -g option: get load8000 with c2t
-
-```
-PC command:
-% ./c2t ../asm6502/intbasic.hex -fg | ap
-
-Apple command:
-] CALL -151
-* FA.FDR 260.2FCR 260G
-
-PC output memory range and entry point to go:
-* A000.B424
-* A000G
-```
-------------------------------------------------------------------------------
-Fast load with load8000 already loaded
-
-```
-PC command:
-% ./c2t ../asm6502/intbasic.hex -f | ap
-
-Apple command:
-] CALL -151
-* FA.FDR 260G
-```
-------------------------------------------------------------------------------
-Manual `load8000.hex` loading
-
-```
-Apple command:
-] CALL -151
-* 260.2FCR
-
-PC Command:
-% ./c2t ~/asm6502/load8000.hex | ap
-
-PC Command dry-run to get Apple command:
-% ./c2t ~/asm6502/integer.hex -n
-] CALL -151
-* BD00.BF0ER 
-
-Apple command: start/end addresses in $FA-$FB/$FC-$FD little-endian
-] CALL -151
-* FA:00 BD 0E BF
-* 260G
-
-PC Command:
-% ./c2t -f ~/asm6502/integer.hex | ap
-```
