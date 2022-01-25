@@ -66,10 +66,8 @@ uint8_t load8000[] = {
 void usage()
 {
     fprintf(stderr, "\nVersion %s\n\n", VERSION);
-    fprintf(stderr,
-            "c2t [-a] [-f] [-n] [-8] [-r rate] [-s start] infile.hex\n");
+    fprintf(stderr, "c2t [-a] [-f] [-n] [-r rate] [-s start] infile.hex\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "-8: 8 bits, default 16 bits\n");
     fprintf(stderr, "-a: applesoft binary (implies -b)\n");
     fprintf(stderr, "-b: binary file (intel hex by default)\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
@@ -80,8 +78,7 @@ void usage()
     fprintf(stderr, "-s: start of program : gives monitor command\n");
 }
 
-void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles,
-                uint8_t bits)
+void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles)
 {
     uint32_t i;
     static uint8_t offset = 0;
@@ -89,61 +86,53 @@ void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles,
         time > 0 ? time * rate : freq >
         0 ? (cycles * rate) / (2 * freq) : cycles;
     for (i = 0; i < n; i++) {
-        int16_t value = ((2 * i * freq) / rate + offset) % 2;
-        if (bits == 16) {
-            int16_t v = value ? 0x6666 : -0x6666;
-            putchar(v & 0xff);
-            putchar(v >> 8 & 0xff);
-        } else {
-            uint8_t v = (int8_t) 0xcc * value + 0x1a;   // $80 +- $66 = 80% 7F
-            putchar(v);
-        }
+        uint8_t value = ((2 * i * freq) / rate + offset) % 2;
+        uint8_t v = (int8_t) value ? 240 : 0;
+        putchar(v);
     }
-
     if (cycles % 2) {
         offset = (offset == 0);
     }
 }
 
-void writebyte(uint8_t byte, uint16_t rate, uint8_t bits, uint8_t fast)
+void writebyte(uint8_t byte, uint16_t rate, uint8_t fast)
 {
     uint8_t j;
     uint32_t freq0 = fast ? 12000 : 2000;
     uint32_t freq1 = fast ? 6000 : 1000;
     for (j = 0; j < 8; j++) {
         if (byte & 0x80)
-            appendtone(freq1, rate, 0, 2, bits);
+            appendtone(freq1, rate, 0, 2);
         else
-            appendtone(freq0, rate, 0, 2, bits);
+            appendtone(freq0, rate, 0, 2);
         byte <<= 1;
     }
 }
 
-void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t bits,
-              uint8_t fast)
+void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
 {
     uint32_t i;
     // header
     if (fast) {
-        appendtone(2000, rate, 0, 500, bits);
+        appendtone(2000, rate, 0, 500);
     } else {
-        appendtone(770, rate, 4, 0, bits);
-        appendtone(2500, rate, 0, 1, bits);
-        appendtone(2000, rate, 0, 1, bits);
+        appendtone(770, rate, 4, 0);
+        appendtone(2500, rate, 0, 1);
+        appendtone(2000, rate, 0, 1);
     }
     // data
     uint8_t checksum = 0xff;
     for (i = 0; i < length; i++) {
-        writebyte(data[i], rate, bits, fast);
+        writebyte(data[i], rate, fast);
         checksum ^= data[i];
     }
     // checksum
-    writebyte(checksum, rate, bits, fast);
+    writebyte(checksum, rate, fast);
     // ending
     if (fast) {
-        appendtone(770, rate, 0, 16, bits);
+        appendtone(770, rate, 0, 16);
     } else {
-        appendtone(1000, rate, 0, 2, bits);
+        appendtone(1000, rate, 0, 2);
     }
 }
 
@@ -182,7 +171,6 @@ int main(int argc, char *argv[])
     int16_t c;
     uint16_t length;
     uint16_t rate = 48000;
-    uint8_t bits = 16;
     uint8_t applesoft = 0;
     uint8_t fake = 0;
     uint8_t fast = 0;
@@ -194,7 +182,7 @@ int main(int argc, char *argv[])
     char buf[256];
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while ((c = getopt(argc, argv, "abfhlmnr:s:8")) != -1) {
+    while ((c = getopt(argc, argv, "abfhlmnr:s:")) != -1) {
         switch (c) {
         case 'a':
             applesoft = 1;
@@ -226,9 +214,6 @@ int main(int argc, char *argv[])
             break;
         case 's':
             start = strtol(optarg, NULL, 16);
-            break;
-        case '8':
-            bits = 8;
             break;
         }
     }
@@ -291,7 +276,7 @@ int main(int argc, char *argv[])
             (length - 1) >> 8 & 0xff,
             lock ? 0xD5 : 0x55
         };
-        buff2wav(array, sizeof(array), rate, bits, fast);
+        buff2wav(array, sizeof(array), rate, fast);
     }
 
     if (fast & !monitor) {
@@ -303,8 +288,8 @@ int main(int argc, char *argv[])
         load8000[0x7B] = end & 0xff;
         load8000[0x7C] = end >> 8;
         // load8000 is send at normal speed
-        buff2wav(load8000, sizeof(load8000), rate, bits, 0);
+        buff2wav(load8000, sizeof(load8000), rate, 0);
     }
-    buff2wav(data, length, rate, bits, fast);
+    buff2wav(data, length, rate, fast);
     return 0;
 }
