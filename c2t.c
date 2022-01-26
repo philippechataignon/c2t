@@ -113,7 +113,7 @@ void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
     if (fast) {
         appendtone(2000, rate, 0, 500);
     } else {
-        appendtone(750, rate,  4, 0);
+        appendtone(770, rate,  4, 0);
         appendtone(2500, rate, 0, 1);
         appendtone(2000, rate, 0, 1);
     }
@@ -127,7 +127,7 @@ void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
     writebyte(checksum, rate, fast);
     // ending
     if (fast) {
-        appendtone(750, rate,  0, 8);
+        appendtone(770, rate,  0, 8);
     } else {
         appendtone(1000, rate, 0, 1);
     }
