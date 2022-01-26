@@ -81,17 +81,14 @@ void usage()
 void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles)
 {
     uint32_t i;
-    static uint8_t offset = 0;
-    uint32_t n =
-        time > 0 ? time * rate : freq >
-        0 ? (cycles * rate) / (2 * freq) : cycles;
-    for (i = 0; i < n; i++) {
-        uint8_t value = ((2 * i * freq) / rate + offset) % 2;
-        uint8_t v = (int8_t) value ? 240 : 0;
-        putchar(v);
+    if (time > 0) {
+        cycles += time * freq;
     }
-    if (cycles % 2) {
-        offset = (offset == 0);
+    uint32_t n = freq > 0 ? (cycles * rate) / (freq) : time * rate + cycles;
+    for (i = 0; i < n; i++) {
+        uint8_t value = ((2 * i * freq) / rate) % 2;
+        uint8_t v = (uint8_t) value == 0 ? 16 : 240;
+        putchar(v);
     }
 }
 
@@ -102,9 +99,9 @@ void writebyte(uint8_t byte, uint16_t rate, uint8_t fast)
     uint32_t freq1 = fast ? 6000 : 1000;
     for (j = 0; j < 8; j++) {
         if (byte & 0x80)
-            appendtone(freq1, rate, 0, 2);
+            appendtone(freq1, rate, 0, 1);
         else
-            appendtone(freq0, rate, 0, 2);
+            appendtone(freq0, rate, 0, 1);
         byte <<= 1;
     }
 }
@@ -116,7 +113,7 @@ void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
     if (fast) {
         appendtone(2000, rate, 0, 500);
     } else {
-        appendtone(770, rate, 4, 0);
+        appendtone(750, rate,  4, 0);
         appendtone(2500, rate, 0, 1);
         appendtone(2000, rate, 0, 1);
     }
@@ -130,9 +127,9 @@ void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
     writebyte(checksum, rate, fast);
     // ending
     if (fast) {
-        appendtone(770, rate, 0, 16);
+        appendtone(750, rate,  0, 8);
     } else {
-        appendtone(1000, rate, 0, 2);
+        appendtone(1000, rate, 0, 1);
     }
 }
 
