@@ -78,20 +78,26 @@ void usage()
     fprintf(stderr, "-s: start of program : gives monitor command\n");
 }
 
-void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t cycles)
+void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t demi_cycles)
 {
     uint32_t i;
     static uint8_t offset = 0;
-    uint32_t n =
-        time > 0 ? time * rate : freq >
-        0 ? (cycles * rate) / (2 * freq) : cycles;
+    if (time > 0) {
+        demi_cycles += 2 * time * freq;
+    }
+    // rate / freq is # of values by cycle, rate / (2 * freq) is # of values by demi_cycle
+    // warning : order is important in integer division: keep 2 in denominator
+    uint32_t n = freq > 0 ? (demi_cycles * rate) / (2 * freq) : time * rate + demi_cycles / 2;
     for (i = 0; i < n; i++) {
-        uint8_t value = ((2 * i * freq) / rate + offset) % 2;
-        uint8_t v = (int8_t) value ? 240 : 0;
+        uint8_t value = (2 * i * freq / rate + offset) % 2;
+        uint8_t v = (int8_t) value ? 240 : 16;
         putchar(v);
     }
-    if (cycles % 2) {
+    // if demi_cycles is odd, remember if last call was low or high, else reset offset
+    if (demi_cycles % 2) {
         offset = (offset == 0);
+    } else {
+        offset = 0;
     }
 }
 
