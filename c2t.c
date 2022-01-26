@@ -90,7 +90,7 @@ void appendtone(uint32_t freq, uint16_t rate, uint32_t time, uint32_t demi_cycle
     uint32_t n = freq > 0 ? (demi_cycles * rate) / (2 * freq) : time * rate + demi_cycles / 2;
     for (i = 0; i < n; i++) {
         uint8_t value = (2 * i * freq / rate + offset) % 2;
-        uint8_t v = (int8_t) value ? 240 : 16;
+        uint8_t v = (int8_t) value == 0 ? 16 : 240;
         putchar(v);
     }
     // if demi_cycles is odd, remember if last call was low or high, else reset offset

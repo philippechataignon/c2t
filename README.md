@@ -6,6 +6,8 @@ for use with the Apple-1 and II (II, II+, //e) cassette interface.
 `c2t` offers high-speed option (-f) as well as the native cassette
 interface ROM routines.
 
+On alsamixer, put master/headphones/PCM: 100%
+
 Written from https://github.com/datajerk/c2t.
 
 ## Options
