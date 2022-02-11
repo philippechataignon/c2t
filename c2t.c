@@ -31,13 +31,22 @@ Description:
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <lz4hc.h>
 
 #include "ihex/kk_ihex_read.h"
 
 #define VERSION "1.2.1"
 #define AUTODETECT_ADDRESS UINT16_MAX
 
-static uint8_t data[65536];
+/* size of dsk = 16 * 35 *256 */
+#define DSKSIZE 143360
+#define SEGSIZE 14336
+#define MAXSIZE 48*1024
+#define BUFFADDR 0x1000
+
+static uint8_t data[DSKSIZE];
+static uint8_t zdata[MAXSIZE];
+static uint8_t seglen[20];
 static uint32_t file_position = 0L;
 static uint16_t address_offset = 0UL;
 static uint16_t ptr = 0;
@@ -126,7 +135,7 @@ void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
     uint32_t i;
     // header
     if (fast) {
-        appendtone(2000, rate, 0, 500);
+        appendtone(2000, rate, 2, 0);
     } else {
         appendtone(770, rate, 4, 0);
         appendtone(2500, rate, 0, 1);
@@ -180,21 +189,22 @@ ihex_data_read(struct ihex_state *ihex,
 int main(int argc, char *argv[])
 {
     FILE *ifp;
+    char buf[256];
+    char *infilename;
     int16_t c;
-    uint16_t length;
+    int32_t start = -1;
+    uint32_t length;
     uint16_t rate = 48000;
     uint8_t applesoft = 0;
+    uint8_t binary = 0;
+    uint8_t dsk = 0;
     uint8_t fake = 0;
     uint8_t fast = 0;
-    uint8_t binary = 0;
     uint8_t lock = 0;
     uint8_t monitor = 0;
-    int32_t start = -1;
-    char *infilename;
-    char buf[256];
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while ((c = getopt(argc, argv, "abfhlmnr:s:")) != -1) {
+    while ((c = getopt(argc, argv, "abdfhlmnr:s:")) != -1) {
         switch (c) {
         case 'a':
             applesoft = 1;
@@ -202,6 +212,11 @@ int main(int argc, char *argv[])
             break;
         case 'b':
             binary = 1;
+            break;
+        case 'd':
+            dsk = 1;
+            binary = 1;
+            fast = 1;
             break;
         case 'f':
             fast = 1;
@@ -240,12 +255,22 @@ int main(int argc, char *argv[])
     if (infilename[0] == '-') {
         ifp = stdin;
     } else if ((ifp = fopen(infilename, "rb")) == NULL) {
-        fprintf(stderr, "Cannot read: %s\n\n", infilename);
+        fprintf(stderr, "Cannot read: %s\n", infilename);
         return 4;
     }
 
     if (binary) {
-        length = fread(data, 1, 65536, ifp);
+        if (dsk) {
+            length = fread(data, 1, DSKSIZE, ifp);
+            fprintf(stderr, "DSK mode\n");
+            if (length != DSKSIZE) {
+                fprintf(stderr, "Incorrect dsk file size : %s %d\n",
+                        infilename, ferror(ifp));
+                return 5;
+            }
+        } else {
+            length = fread(data, 1, MAXSIZE, ifp);
+        }
     } else {
         struct ihex_state ihex;
         ihex_read_at_address(&ihex, 0);
@@ -282,26 +307,56 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if (applesoft) {
-        uint8_t array[3] = {
-            (length - 1) & 0xff,
-            (length - 1) >> 8 & 0xff,
-            lock ? 0xD5 : 0x55
-        };
-        buff2wav(array, sizeof(array), rate, fast);
-    }
+    if (dsk) {
+        uint8_t seg;
+        // compress to get len
+        for (seg = 0; seg <10; seg++) {
+                const uint16_t l = BUFFADDR + LZ4_compress_HC(
+                    (char*)data + SEGSIZE * seg,
+                    (char*)zdata,
+                    SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
+                );
 
-    if (fast & !monitor) {
-        uint32_t end = start + length;
-        load8000[0x41] = start & 0xff;
-        load8000[0x42] = start >> 8;
-        load8000[0x52] = start & 0xff;
-        load8000[0x53] = start >> 8;
-        load8000[0x79] = end & 0xff;
-        load8000[0x7A] = end >> 8;
-        // load8000 is send at normal speed
-        buff2wav(load8000, sizeof(load8000), rate, 0);
+                seglen[9-seg] = l & 0xff;
+                seglen[19-seg] = l >> 8;
+        }
+        // send param at low speed
+        buff2wav((uint8_t*)seglen, sizeof(seglen), rate, 0);
+        // appendtone(0, rate, 4, 0);
+        // send each segment
+        for (seg = 0; seg <10; seg++) {
+                const uint16_t zdata_length = LZ4_compress_HC(
+                    (char*)data + SEGSIZE * seg,
+                    (char*)zdata,
+                    SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
+                );
+            fprintf(stderr, "Segment %d: %d\n", seg, zdata_length);
+            buff2wav(zdata, zdata_length, rate, fast);
+            // add silence between segments
+            appendtone(0, rate, 10, 0);
+        }
+    } else {
+        if (applesoft) {
+            uint8_t array[3] = {
+                (length - 1) & 0xff,
+                (length - 1) >> 8 & 0xff,
+                lock ? 0xD5 : 0x55
+            };
+            buff2wav(array, sizeof(array), rate, fast);
+        }
+
+        if (fast & !monitor) {
+            uint32_t end = start + length;
+            load8000[0x41] = start & 0xff;
+            load8000[0x42] = start >> 8;
+            load8000[0x52] = start & 0xff;
+            load8000[0x53] = start >> 8;
+            load8000[0x79] = end & 0xff;
+            load8000[0x7A] = end >> 8;
+            // load8000 is send at normal speed
+            buff2wav(load8000, sizeof(load8000), rate, 0);
+        }
+        buff2wav(data, length, rate, fast);
     }
-    buff2wav(data, length, rate, fast);
     return 0;
 }
