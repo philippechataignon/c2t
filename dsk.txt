@@ -1,0 +1,7 @@
+Apple ][ dsk is 35 tracks * 16 sectors * 256 bytes = 143360 bytes = $23000 bytes = 560 sectors
+
+Dsk is splitted in 10 parts. Each part is: $23000 / 10 = $3800 bytes = 56 sectors
+
+Compressed data is read and stored in $1000-$47FF range and decompressed in
+$4800-$7FFF range.
+
