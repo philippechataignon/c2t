@@ -31,13 +31,20 @@ Description:
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <lz4hc.h>
 
 #include "ihex/kk_ihex_read.h"
 
 #define VERSION "1.2.1"
 #define AUTODETECT_ADDRESS UINT16_MAX
 
-static uint8_t data[65536];
+/* size of dsk = 16 * 35 *256 */
+#define DSKSIZE 143360
+#define SEGSIZE 14336
+#define MAXSIZE 48*1024
+
+static uint8_t data[DSKSIZE];
+static uint8_t zdata[MAXSIZE];
 static uint32_t file_position = 0L;
 static uint16_t address_offset = 0UL;
 static uint16_t ptr = 0;
@@ -180,21 +187,22 @@ ihex_data_read(struct ihex_state *ihex,
 int main(int argc, char *argv[])
 {
     FILE *ifp;
+    char buf[256];
+    char *infilename;
     int16_t c;
-    uint16_t length;
+    int32_t start = -1;
+    uint32_t length;
     uint16_t rate = 48000;
     uint8_t applesoft = 0;
+    uint8_t binary = 0;
+    uint8_t dsk = 0;
     uint8_t fake = 0;
     uint8_t fast = 0;
-    uint8_t binary = 0;
     uint8_t lock = 0;
     uint8_t monitor = 0;
-    int32_t start = -1;
-    char *infilename;
-    char buf[256];
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while ((c = getopt(argc, argv, "abfhlmnr:s:")) != -1) {
+    while ((c = getopt(argc, argv, "abdfhlmnr:s:")) != -1) {
         switch (c) {
         case 'a':
             applesoft = 1;
@@ -202,6 +210,11 @@ int main(int argc, char *argv[])
             break;
         case 'b':
             binary = 1;
+            break;
+        case 'd':
+            dsk = 1;
+            binary = 1;
+            fast = 1;
             break;
         case 'f':
             fast = 1;
@@ -240,12 +253,22 @@ int main(int argc, char *argv[])
     if (infilename[0] == '-') {
         ifp = stdin;
     } else if ((ifp = fopen(infilename, "rb")) == NULL) {
-        fprintf(stderr, "Cannot read: %s\n\n", infilename);
+        fprintf(stderr, "Cannot read: %s\n", infilename);
         return 4;
     }
 
     if (binary) {
-        length = fread(data, 1, 65536, ifp);
+        if (dsk) {
+            length = fread(data, 1, DSKSIZE, ifp);
+            fprintf(stderr, "DSK mode\n");
+            if (length != DSKSIZE) {
+                fprintf(stderr, "Incorrect dsk file size : %s %d\n",
+                        infilename, ferror(ifp));
+                return 5;
+            }
+        } else {
+            length = fread(data, 1, MAXSIZE, ifp);
+        }
     } else {
         struct ihex_state ihex;
         ihex_read_at_address(&ihex, 0);
@@ -302,6 +325,18 @@ int main(int argc, char *argv[])
         // load8000 is send at normal speed
         buff2wav(load8000, sizeof(load8000), rate, 0);
     }
-    buff2wav(data, length, rate, fast);
+
+    if (dsk) {
+        uint8_t seg;
+        for (seg = 0; seg <10; seg++) {
+            const int zdata_length = LZ4_compress_HC(
+                    (char*)data + SEGSIZE * seg, (char*)zdata, SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX);
+            fprintf(stderr, "Segment %d: %d\n", seg, zdata_length);
+            buff2wav(zdata, zdata_length, rate, fast);
+            appendtone(0, rate, 10, 0);
+        }
+    } else {
+        buff2wav(data, length, rate, fast);
+    }
     return 0;
 }
