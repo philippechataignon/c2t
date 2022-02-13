@@ -79,12 +79,14 @@ void usage()
     fprintf(stderr, "\n");
     fprintf(stderr, "-a: applesoft binary (implies -b)\n");
     fprintf(stderr, "-b: binary file (intel hex by default)\n");
+    fprintf(stderr, "-d: dsk mode, must be use with diskload\n");
     fprintf(stderr, "-f: fast load (need load8000)\n");
     fprintf(stderr, "-l: locked basic program (implies -a -b)\n");
     fprintf(stderr, "-m: fast load monitor mode, doesn't send load8000\n");
     fprintf(stderr, "-n: dry run\n");
     fprintf(stderr, "-r: rate 48000/44100/22050/11025/8000\n");
     fprintf(stderr, "-s: start of program : gives monitor command\n");
+    fprintf(stderr, "-t: time in seconds to write tracks in dsk mode\n");
 }
 
 void appendtone(uint32_t freq, uint16_t rate, uint32_t time,
@@ -135,7 +137,7 @@ void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
     uint32_t i;
     // header
     if (fast) {
-        appendtone(2000, rate, 2, 0);
+        appendtone(2000, rate, 0, 500);
     } else {
         appendtone(770, rate, 4, 0);
         appendtone(2500, rate, 0, 1);
@@ -202,9 +204,10 @@ int main(int argc, char *argv[])
     uint8_t fast = 0;
     uint8_t lock = 0;
     uint8_t monitor = 0;
+    uint8_t wait_time = 12;
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
-    while ((c = getopt(argc, argv, "abdfhlmnr:s:")) != -1) {
+    while ((c = getopt(argc, argv, "abdfhlmnr:s:t:")) != -1) {
         switch (c) {
         case 'a':
             applesoft = 1;
@@ -241,6 +244,9 @@ int main(int argc, char *argv[])
             break;
         case 's':
             start = strtol(optarg, NULL, 16);
+            break;
+        case 't':
+            wait_time = atoi(optarg);
             break;
         }
     }
@@ -311,29 +317,27 @@ int main(int argc, char *argv[])
         uint8_t seg;
         // compress to get len
         for (seg = 0; seg <10; seg++) {
-                const uint16_t l = BUFFADDR + LZ4_compress_HC(
-                    (char*)data + SEGSIZE * seg,
-                    (char*)zdata,
-                    SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
-                );
-
-                seglen[9-seg] = l & 0xff;
-                seglen[19-seg] = l >> 8;
+            const uint16_t l = BUFFADDR + LZ4_compress_HC(
+                (char*)data + SEGSIZE * seg,
+                (char*)zdata,
+                SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
+            );
+            seglen[9-seg] = l & 0xff;
+            seglen[19-seg] = l >> 8;
         }
         // send param at low speed
         buff2wav((uint8_t*)seglen, sizeof(seglen), rate, 0);
-        // appendtone(0, rate, 4, 0);
         // send each segment
         for (seg = 0; seg <10; seg++) {
-                const uint16_t zdata_length = LZ4_compress_HC(
-                    (char*)data + SEGSIZE * seg,
-                    (char*)zdata,
-                    SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
-                );
+            const uint16_t zdata_length = LZ4_compress_HC(
+                (char*)data + SEGSIZE * seg,
+                (char*)zdata,
+                SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
+            );
             fprintf(stderr, "Segment %d: %d\n", seg, zdata_length);
             buff2wav(zdata, zdata_length, rate, fast);
+            appendtone(0, rate, wait_time, 0);
             // add silence between segments
-            appendtone(0, rate, 10, 0);
         }
     } else {
         if (applesoft) {
