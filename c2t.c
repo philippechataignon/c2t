@@ -45,6 +45,7 @@ Description:
 
 static uint8_t data[DSKSIZE];
 static uint8_t zdata[MAXSIZE];
+static uint16_t seglen[10];
 static uint32_t file_position = 0L;
 static uint16_t address_offset = 0UL;
 static uint16_t ptr = 0;
@@ -305,37 +306,51 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if (applesoft) {
-        uint8_t array[3] = {
-            (length - 1) & 0xff,
-            (length - 1) >> 8 & 0xff,
-            lock ? 0xD5 : 0x55
-        };
-        buff2wav(array, sizeof(array), rate, fast);
-    }
-
-    if (fast & !monitor) {
-        uint32_t end = start + length;
-        load8000[0x41] = start & 0xff;
-        load8000[0x42] = start >> 8;
-        load8000[0x52] = start & 0xff;
-        load8000[0x53] = start >> 8;
-        load8000[0x79] = end & 0xff;
-        load8000[0x7A] = end >> 8;
-        // load8000 is send at normal speed
-        buff2wav(load8000, sizeof(load8000), rate, 0);
-    }
-
     if (dsk) {
         uint8_t seg;
+        // compress to get len
         for (seg = 0; seg <10; seg++) {
-            const int zdata_length = LZ4_compress_HC(
-                    (char*)data + SEGSIZE * seg, (char*)zdata, SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX);
+                seglen[seg] = LZ4_compress_HC(
+                    (char*)data + SEGSIZE * seg,
+                    (char*)zdata,
+                    SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
+                );
+        }
+        // send param at low speed
+        buff2wav((uint8_t*)seglen, sizeof(seglen), rate, 0);
+        // send each segment
+        for (seg = 0; seg <10; seg++) {
+                const int zdata_length = LZ4_compress_HC(
+                    (char*)data + SEGSIZE * seg,
+                    (char*)zdata,
+                    SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
+                );
             fprintf(stderr, "Segment %d: %d\n", seg, zdata_length);
             buff2wav(zdata, zdata_length, rate, fast);
+            // add silence between segments
             appendtone(0, rate, 10, 0);
         }
     } else {
+        if (applesoft) {
+            uint8_t array[3] = {
+                (length - 1) & 0xff,
+                (length - 1) >> 8 & 0xff,
+                lock ? 0xD5 : 0x55
+            };
+            buff2wav(array, sizeof(array), rate, fast);
+        }
+
+        if (fast & !monitor) {
+            uint32_t end = start + length;
+            load8000[0x41] = start & 0xff;
+            load8000[0x42] = start >> 8;
+            load8000[0x52] = start & 0xff;
+            load8000[0x53] = start >> 8;
+            load8000[0x79] = end & 0xff;
+            load8000[0x7A] = end >> 8;
+            // load8000 is send at normal speed
+            buff2wav(load8000, sizeof(load8000), rate, 0);
+        }
         buff2wav(data, length, rate, fast);
     }
     return 0;
