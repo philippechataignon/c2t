@@ -42,10 +42,11 @@ Description:
 #define DSKSIZE 143360
 #define SEGSIZE 14336
 #define MAXSIZE 48*1024
+#define BUFFADDR 0x1000
 
 static uint8_t data[DSKSIZE];
 static uint8_t zdata[MAXSIZE];
-static uint16_t seglen[10];
+static uint8_t seglen[20];
 static uint32_t file_position = 0L;
 static uint16_t address_offset = 0UL;
 static uint16_t ptr = 0;
@@ -134,7 +135,7 @@ void buff2wav(uint8_t * data, uint32_t length, uint16_t rate, uint8_t fast)
     uint32_t i;
     // header
     if (fast) {
-        appendtone(2000, rate, 0, 500);
+        appendtone(2000, rate, 2, 0);
     } else {
         appendtone(770, rate, 4, 0);
         appendtone(2500, rate, 0, 1);
@@ -310,17 +311,21 @@ int main(int argc, char *argv[])
         uint8_t seg;
         // compress to get len
         for (seg = 0; seg <10; seg++) {
-                seglen[seg] = LZ4_compress_HC(
+                const uint16_t l = BUFFADDR + LZ4_compress_HC(
                     (char*)data + SEGSIZE * seg,
                     (char*)zdata,
                     SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
                 );
+
+                seglen[9-seg] = l & 0xff;
+                seglen[19-seg] = l >> 8;
         }
         // send param at low speed
         buff2wav((uint8_t*)seglen, sizeof(seglen), rate, 0);
+        // appendtone(0, rate, 4, 0);
         // send each segment
         for (seg = 0; seg <10; seg++) {
-                const int zdata_length = LZ4_compress_HC(
+                const uint16_t zdata_length = LZ4_compress_HC(
                     (char*)data + SEGSIZE * seg,
                     (char*)zdata,
                     SEGSIZE, MAXSIZE, LZ4HC_CLEVEL_MAX
