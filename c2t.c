@@ -212,6 +212,7 @@ int main(int argc, char *argv[])
         case 'a':
             applesoft = 1;
             binary = 1;
+            fast = 0;
             break;
         case 'b':
             binary = 1;
