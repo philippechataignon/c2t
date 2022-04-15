@@ -40,13 +40,14 @@ Description:
 
 /* size of dsk = 16 * 35 *256 */
 #define DSKSIZE 143360
-#define SEGSIZE 14336
+#define NBSEG 10
+#define SEGSIZE (DSKSIZE / NBSEG)
 #define MAXSIZE 48*1024
 #define BUFFADDR 0x1000
 
 static uint8_t data[DSKSIZE];
 static uint8_t zdata[MAXSIZE];
-static uint8_t seglen[20];
+static uint8_t seglen[2 * NBSEG];
 static uint32_t file_position = 0L;
 static uint16_t address_offset = 0UL;
 static uint16_t ptr = 0;
@@ -317,7 +318,7 @@ int main(int argc, char *argv[])
     if (dsk) {
         uint8_t seg;
         // compress to get len
-        for (seg = 0; seg <10; seg++) {
+        for (seg = 0; seg <NBSEG; seg++) {
             const uint16_t l = BUFFADDR + LZ4_compress_HC(
                 (char*)data + SEGSIZE * seg,
                 (char*)zdata,
@@ -329,7 +330,7 @@ int main(int argc, char *argv[])
         // send param at low speed
         buff2wav((uint8_t*)seglen, sizeof(seglen), rate, 0);
         // send each segment
-        for (seg = 0; seg <10; seg++) {
+        for (seg = 0; seg <NBSEG; seg++) {
             const uint16_t zdata_length = LZ4_compress_HC(
                 (char*)data + SEGSIZE * seg,
                 (char*)zdata,
