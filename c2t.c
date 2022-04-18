@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
     uint8_t fast = 0;
     uint8_t lock = 0;
     uint8_t monitor = 0;
-    uint8_t wait_time = 12;
+    uint8_t wait_time = 15;
     address_offset = AUTODETECT_ADDRESS;
     opterr = 1;
     while ((c = getopt(argc, argv, "abdfhlmnr:s:t:")) != -1) {
