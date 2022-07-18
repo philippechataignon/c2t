@@ -2,12 +2,15 @@
 import sys
 import serial
 def main():
+    filename = "ser.out" if len(sys.argv) <= 1 else sys.argv[1]
+    print(filename)
     ack = b'\x06'
-    ser = serial.Serial('/dev/ttyUSB0')  # open serial port
-    ser.baudrate=19200
-    ser.bytesize=8
-    ser.rtscts=1
-    ser.dsrdtr=1
+    ser = serial.Serial('/dev/ttyUSB0',
+        baudrate=19200,
+        bytesize=8,
+        rtscts=1,
+        dsrdtr=1,
+    )
     print(ser)         # check which port was really used
     c1 = ser.read(1)
     c2 = ser.read(1)
@@ -15,8 +18,7 @@ def main():
     if c1 == b'\x19' and c2 == b'\x64' and c3 == b'\x00':
         print("Start OK", file=sys.stderr)
         ser.write(ack)
-
-    with open(f"ser.out", "wb") as g:
+    with open(filename, "wb") as g:
         for i in range(5):
             print(f"Wait segment #{i+1}")
             for j in range(7):
