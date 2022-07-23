@@ -18,7 +18,6 @@ def fill(b):
     lb = (len(b) // 256 + 1) * 256
     return (b + 256 * b'\x00')[:lb]
 
-
 def main():
     if len(sys.argv) != 2:
         print("Entrer dsk filename")
@@ -39,11 +38,10 @@ def main():
             store_size = False,
         ) for c in l
     ]
-    lc = [fill(c) for c in lc]
-    param = fill(bytes([len(cc)>>8 for cc in lc]))
+    print([hex(len(cc)) for cc in lc])
+    param = b"".join([len(cc).to_bytes(2, byteorder="little") for cc in lc])
 
-#    ser = serial.Serial('/dev/ttyUSB0', baudrate=19200, timeout=0)
-    ser = serial.Serial('/dev/pts/2', baudrate=19200)
+    ser = serial.Serial('/dev/ttyUSB0', baudrate=19200)
     def putc(data, timeout=1):
         return ser.write(data)
     def getc(size, timeout=1):
