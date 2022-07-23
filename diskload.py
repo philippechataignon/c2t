@@ -19,6 +19,8 @@ def fill(b):
     return (b + 256 * b'\x00')[:lb]
 
 def main():
+    buffaddr = 0x1000
+
     if len(sys.argv) != 2:
         print("Entrer dsk filename")
         return
@@ -38,8 +40,9 @@ def main():
             store_size = False,
         ) for c in l
     ]
-    print([hex(len(cc)) for cc in lc])
-    param = b"".join([len(cc).to_bytes(2, byteorder="little") for cc in lc])
+    endaddr = [buffaddr + len(cc) for cc in lc]
+    print([hex(cc) for cc in endaddr])
+    param = b"".join([cc.to_bytes(2, byteorder="little") for cc in endaddr])
 
     ser = serial.Serial('/dev/ttyUSB0', baudrate=19200)
     def putc(data, timeout=1):
