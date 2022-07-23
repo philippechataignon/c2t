@@ -1,4 +1,5 @@
 *.o
 *.wav
+*.dsk
 c2t
 lz4_compress

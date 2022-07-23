@@ -1,12 +1,34 @@
 #!/usr/bin/env python3
+'''
+xmodem send (M0 .. M9)
+xmodem send S0
+      .
+      .
+xmodem send S9
+'''
+
+import sys
+import io
+import os.path
+import serial
+from xmodem import XMODEM
 import lz4.block
 
 def fill(b):
     lb = (len(b) // 256 + 1) * 256
     return (b + 256 * b'\x00')[:lb]
 
+
 def main():
-    f = open("dos33.dsk", "rb")
+    if len(sys.argv) != 2:
+        print("Entrer dsk filename")
+        return
+    fn = sys.argv[1]
+    if os.path.getsize(fn) != 143360:
+        print("Filesize must be 143360")
+        return
+    f = open(sys.argv[1], "rb")
+
     a = f.read()
     l = [ a[s:s+14336] for s in range(0, 143360, 14336) ]
     lc = [
@@ -18,8 +40,21 @@ def main():
         ) for c in l
     ]
     lc = [fill(c) for c in lc]
-    print([hex(len(cc)>>8) for cc in lc])
+    param = fill(bytes([len(cc)>>8 for cc in lc]))
+
+#    ser = serial.Serial('/dev/ttyUSB0', baudrate=19200, timeout=0)
+    ser = serial.Serial('/dev/pts/2', baudrate=19200)
+    def putc(data, timeout=1):
+        return ser.write(data)
+    def getc(size, timeout=1):
+        return ser.read(size) or None
+    modem = XMODEM(getc, putc)
+
+    print("Send param")
+    modem.send(io.BytesIO(param))
+    for numseg, seg in enumerate(lc):
+        print(f"Send segment #{numseg}")
+        modem.send(io.BytesIO(seg))
 
 if __name__ == '__main__':
     main()
-
