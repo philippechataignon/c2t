@@ -1,43 +1,40 @@
 #!/usr/bin/env python3
 import sys
+import io
+import os.path
 import serial
+from xmodem import XMODEM
+
 def main():
-    filename = "ser.out" if len(sys.argv) <= 1 else sys.argv[1]
-    print(filename)
+    ser = serial.Serial('/dev/ttyUSB0', baudrate=19200)
+    def putc(data, timeout=1):
+        return ser.write(data)
+    def getc(size, timeout=1):
+        return ser.read(size) or None
+
     ack = b'\x06'
-    ser = serial.Serial('/dev/ttyUSB0',
-        baudrate=19200,
-        bytesize=8,
-        rtscts=1,
-        dsrdtr=1,
-    )
-    print(ser)         # check which port was really used
-    c1 = ser.read(1)
-    c2 = ser.read(1)
-    c3 = ser.read(1)
-    if c1 == b'\x19' and c2 == b'\x64' and c3 == b'\x00':
-        print("Start OK", file=sys.stderr)
-        ser.write(ack)
-    with open(filename, "wb") as g:
-        for i in range(5):
-            print(f"Wait segment #{i+1}")
-            for j in range(7):
-                c = ser.read(0x1000)
-                g.write(c)
-                print(".", end="", file=sys.stderr, flush=True)
-            print(file=sys.stderr)
-            print(f"Get segment #{i+1}", file=sys.stderr)
+    esc = b'\x9B'
+    nbseg = 5
+
+    if len(sys.argv) != 2:
+        print("Entrer dsk filename")
+        return
+    fn = sys.argv[1]
+    modem = XMODEM(getc, putc)
+    print(ser)
+
+    for i in range(nbseg):
+        print("Waiting", file=sys.stderr)
+        wait_esc = ser.read(1)
+        if wait_esc == esc:
+            # print("Get ESC char, send ACK", file=sys.stderr)
             ser.write(ack)
-
-    # final ack
-    c1 = ser.read(1)
-    if c1 == ack:
-        print("OK, done.", file=sys.stderr)
-        ser.write(ack)
-    else:
-        print("Error: no ack", file=sys.stderr)
-
-
+        else:
+            print("Error: no ESC char received, exit", file=sys.stderr)
+            return 1
+        with open(fn, "ab") as stream:
+            print(f"Get segment #{i}")
+            modem.recv(stream, crc_mode=0)
     ser.close()
 
 if __name__ == '__main__':
