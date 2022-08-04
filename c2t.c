@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
 
     if (start >= 0) {
         int32_t end = start + length - 1;
-        fprintf(stderr, "Memory range: %X.%X\n", start, end);
+        fprintf(stderr, "Memory range: %X.%X A$%X,L$%X\n", start, end, start, end - start + 1);
         fprintf(stderr, "] CALL -151\n");
         if (fast) {
             if (monitor) {
