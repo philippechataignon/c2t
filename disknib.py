@@ -9,12 +9,12 @@ from xmodem import XMODEM
 
 def main():
     numtrk = 35
-    #ser = serial.Serial('/dev/ttyUSB0', baudrate=19200)
-    #def putc(data, timeout=1):
-    #    return ser.write(data)
-    #def getc(size, timeout=1):
-    #    return ser.read(size) or None
-    #modem = XMODEM(getc, putc)
+    ser = serial.Serial('/dev/ttyUSB0', baudrate=19200)
+    def putc(data, timeout=1):
+        return ser.write(data)
+    def getc(size, timeout=1):
+        return ser.read(size) or None
+    modem = XMODEM(getc, putc)
     buffaddr = 0x1000
 
     if len(sys.argv) != 2:
